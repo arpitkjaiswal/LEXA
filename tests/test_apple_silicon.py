@@ -10,9 +10,9 @@ from buddy.core.platform_support import host_support, require_apple_silicon
 @pytest.mark.parametrize(
     "family,os_version",
     [
-        ("M1", "14.4"),
-        ("M2", "14.7.1"),
-        ("M3", "15.0"),
+        ("M1", "15.2"),
+        ("M2", "15.7.1"),
+        ("M3", "15.2"),
         ("M4", "15.3"),
         ("M5", "26.0"),
         ("future arm64", "27.0"),
@@ -27,7 +27,7 @@ def test_native_abi_accepts_all_target_families_and_successors(family, os_versio
     [
         ("darwin", "x86_64", "26.0"),
         ("darwin", "arm64", "13.7"),
-        ("darwin", "arm64", "14.3.1"),
+        ("darwin", "arm64", "15.1.1"),
         ("darwin", "arm64", ""),
         ("linux", "aarch64", "14.0"),
     ],
@@ -74,7 +74,7 @@ def bundle(tmp_path):
         plistlib.dumps(
             {
                 "CFBundleExecutable": "BUDDY",
-                "LSMinimumSystemVersion": "14.4",
+                "LSMinimumSystemVersion": "15.2",
                 "CFBundleShortVersionString": "0.2.0",
             }
         )
@@ -107,9 +107,9 @@ def test_binary_audit_checks_transitive_libraries(tmp_path):
         verify_bundle(app, inspector=wrong_arch)
 
     def wrong_os(path):
-        return {"architectures": ["arm64"], "minimum_macos": "15.0" if path == library else "11.0"}
+        return {"architectures": ["arm64"], "minimum_macos": "16.0" if path == library else "11.0"}
 
-    with pytest.raises(ValueError, match="above the 14.4 baseline"):
+    with pytest.raises(ValueError, match="above the 15.2 baseline"):
         verify_bundle(app, inspector=wrong_os)
 
 

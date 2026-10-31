@@ -56,7 +56,8 @@ The metadata audit log excludes audio, text, tool arguments/results and credenti
 
 ## Desktop and distribution
 
-The distribution target is native arm64 macOS 14.4+, covering the M1–M5 families with one ABI.
+The distribution target is native arm64 macOS 15.2+, covering the M1–M5 families with one ABI.
+Qt 6.11.3 and LiteRT 2.3.0 are pinned to avoid a wheel upgrade silently raising the OS baseline.
 Desktop/voice startup checks the process architecture and OS version before audio or GUI
 initialization. Rosetta/x86_64 receives an actionable native-Python diagnostic. The check
 does not reject future compatible chips by model name.
@@ -73,7 +74,7 @@ default to ONNX. No site-packages files are rewritten.
 Settings writes are atomic; secrets stay in a separate .env. A packaged app defaults to
 Application Support configuration and restores known Homebrew directories to Finder's PATH.
 PyInstaller explicitly targets arm64 and collects the fixed plugin modules, native
-speech/recognition dependencies and LiteRT. The app declares macOS 14.4 as its minimum.
+speech/recognition dependencies and LiteRT. The app declares macOS 15.2 as its minimum.
 Build validation checks every Mach-O arm64 slice and its deployment target using lipo/otool,
 then emits a compatibility manifest. The packaged desktop has a bounded, no-audio demo smoke mode
 that verifies Qt startup and worker shutdown on the build OS and a newer macOS runner.

@@ -2,7 +2,7 @@
 
 Repository: LEXA. Companion: BUDDY. Version 0.2 adds the remaining application layers.
 “Implemented” here describes source, not completion of physical Mac release certification.
-Distribution targets native arm64 Apple Silicon M1–M5 and compatible successors on macOS 14.4+.
+Distribution targets native arm64 Apple Silicon M1–M5 and compatible successors on macOS 15.2+.
 
 | Phase | Source status | Remaining validation |
 | --- | --- | --- |

@@ -15,7 +15,7 @@ from buddy.core.platform_support import host_support
 def report(config: Config) -> list[str]:
     lines = [
         f"BUDDY | Python {platform.python_version()} | {platform.system()} {platform.machine()}",
-        "Target: Apple Silicon M1–M5 and compatible arm64 successors, macOS 14.4+.",
+        "Target: Apple Silicon M1–M5 and compatible arm64 successors, macOS 15.2+.",
         host_support().message,
         "This check does not request permissions or contact AI services.",
         f"LLM provider: {config.brain.provider}",

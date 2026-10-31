@@ -9,12 +9,14 @@ laptop actions through an allowlist.
 ## Apple Silicon target
 
 One native **arm64** app targets **M1, M2, M3, M4 and M5** families, including their
-Pro/Max/Ultra variants where available. The baseline is **macOS 14.4 Sonoma or later**.
+Pro/Max/Ultra variants where available. The baseline is **macOS 15.2 or later**.
 The runtime checks the ABI and OS version rather than maintaining a chip-name allowlist,
 so compatible future arm64 Macs are not blocked. Intel/Rosetta builds are no longer shipped.
 
 CI audits the app executable and every bundled Mach-O dependency for an arm64 slice and
-a deployment target no newer than macOS 14.4. The same built app is smoke-tested on macOS 15
+a deployment target no newer than macOS 15.2. Qt 6.11.3 and LiteRT 2.3.0 are pinned
+to their verified binary requirements; re-run the audit before changing these versions.
+The same built app is smoke-tested on macOS 15
 and the current macOS runner. This is architecture/OS validation, not physical testing of
 every M-series model; microphone and wake-word accuracy need on-device acceptance.
 
@@ -250,4 +252,4 @@ See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.
 [validation and physical checks](docs/VALIDATION.md), and [security](SECURITY.md).
 
 Linux is used only for development checks; the shipped desktop/voice entry points require
-native arm64 macOS 14.4+. Text/demo/doctor commands and offscreen Qt tests remain usable for development.
+native arm64 macOS 15.2+. Text/demo/doctor commands and offscreen Qt tests remain usable for development.
