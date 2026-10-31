@@ -105,6 +105,31 @@ raise SystemExit(worker_main())
         await stt.close()
 
 
+async def test_worker_failure_reports_only_dependency_category_not_private_exception(monkeypatch):
+    real_spawn = asyncio.create_subprocess_exec
+    script = """
+import buddy.core.stt as core
+from buddy.core.stt_process import worker_main
+class Model:
+    def __init__(self, config): pass
+    def _load(self):
+        raise ModuleNotFoundError('private content must never escape', name='missing_test_module')
+core.WhisperSTT = Model
+raise SystemExit(worker_main())
+"""
+
+    async def spawn(*command, **kwargs):
+        return await real_spawn(sys.executable, "-u", "-c", script, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    stt = ProcessSTT(STTConfig())
+    with pytest.raises(TranscriptionError) as error:
+        await stt.prepare()
+    assert "missing_test_module" in str(error.value)
+    assert "private content" not in str(error.value)
+    assert stt.process is None
+
+
 async def test_crashed_worker_returns_safe_error_and_can_be_retried(monkeypatch):
     real_spawn = asyncio.create_subprocess_exec
     processes = []

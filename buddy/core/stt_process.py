@@ -10,6 +10,7 @@ import asyncio
 import base64
 import json
 import os
+import re
 import struct
 import sys
 from contextlib import redirect_stderr, redirect_stdout, suppress
@@ -43,9 +44,18 @@ class ProcessSTT:
             raise ValueError("Invalid STT response size")
         reply = json.loads(await self.process.stdout.readexactly(size))
         if not isinstance(reply, dict) or reply.get("ok") is not True:
+            details = []
+            if isinstance(reply, dict):
+                for key in ("phase", "category", "missing_module"):
+                    value = reply.get(key, "")
+                    if isinstance(value, str) and re.fullmatch(
+                        r"[A-Za-z_][A-Za-z0-9_.]{0,150}", value
+                    ):
+                        details.append(value)
             raise TranscriptionError(
                 "Whisper could not prepare or transcribe. Check the model, network, disk/RAM "
                 "and voice dependencies, then try Prepare voice again."
+                + (" Diagnostic: " + ", ".join(details) + "." if details else "")
             )
         return reply
 
@@ -141,6 +151,7 @@ def worker_main() -> int:
         os.fdopen(0, "rb", closefd=False) as source,
         os.fdopen(1, "wb", closefd=False) as sink,
     ):
+        phase = "prepare"
         try:
             request = _read_frame(source)
             if request is None:
@@ -150,6 +161,7 @@ def worker_main() -> int:
             sink.write(encode_frame({"ok": True}))
             sink.flush()
             while (request := _read_frame(source)) is not None:
+                phase = "transcribe"
                 rate = request["sample_rate"]
                 if not isinstance(rate, int) or not 8000 <= rate <= 192000:
                     raise ValueError("Invalid sample rate")
@@ -158,8 +170,20 @@ def worker_main() -> int:
                 sink.write(encode_frame({"ok": True, "text": text}))
                 sink.flush()
             return 0
-        except Exception:
-            sink.write(encode_frame({"ok": False}))
+        except Exception as error:
+            cause = error.__context__ or error
+            # Class/module identifiers help diagnose frozen dependencies without
+            # exposing exception strings, request content, paths or credentials.
+            sink.write(
+                encode_frame(
+                    {
+                        "ok": False,
+                        "phase": phase,
+                        "category": type(cause).__name__,
+                        "missing_module": getattr(cause, "name", ""),
+                    }
+                )
+            )
             sink.flush()
             return 1
 
