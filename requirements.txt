@@ -1,0 +1,2 @@
+# macOS voice MVP; install from the repository root in a virtual environment.
+-e .[voice]

@@ -1,0 +1,44 @@
+pet:
+  name: BUDDY
+  user_name: Arpit
+  personality: >-
+    Casual, warm, lightly funny and encouraging. Talk like a thoughtful friend.
+    Usually use 1-3 short sentences unless I ask for a detailed explanation.
+
+brain:
+  provider: anthropic  # anthropic | openai | ollama
+  model: ""           # or set BUDDY_MODEL in .env
+  max_output_tokens: 512
+  timeout_seconds: 45
+  history_turns: 10    # RAM only in Phase 1; /reset clears it
+  max_input_chars: 6000
+  ollama_base_url: http://127.0.0.1:11434
+
+audio:
+  device: null        # use --list-devices to find a microphone index
+  sample_rate: 16000  # falls back to the device's native rate if necessary
+  max_record_seconds: 25
+  min_record_seconds: 0.25
+  silence_rms: 0.003
+  hotkey: <ctrl>+<alt>+<space>
+
+stt:
+  model: small       # multilingual; use tiny for a lighter first run
+  device: cpu        # CTranslate2 CPU; MPS is not a faster-whisper backend
+  compute_type: int8
+  language: null     # auto-detect; set en for English only
+  local_files_only: false  # true after downloading, for strict offline operation
+
+tts:
+  backend: edge      # edge | pyttsx3 | say (macOS) | none
+  voice: en-IN-NeerjaNeural
+  rate: +0%
+  local_voice: ""    # optional installed pyttsx3 voice ID / macOS say voice name
+  local_rate: 180
+  fallback: [pyttsx3, say] # local backends only; never silently upload to another TTS
+  timeout_seconds: 45
+
+logging:
+  enabled: true
+  max_bytes: 1000000
+  backups: 3
