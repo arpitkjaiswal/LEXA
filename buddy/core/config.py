@@ -54,7 +54,7 @@ class STTConfig:
 
 @dataclass(frozen=True)
 class TTSConfig:
-    backend: str = "edge"
+    backend: str = "say"
     voice: str = "en-IN-NeerjaNeural"
     rate: str = "+0%"
     local_voice: str = ""

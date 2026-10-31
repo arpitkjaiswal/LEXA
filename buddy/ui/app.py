@@ -6,11 +6,13 @@ import asyncio
 import html
 import json
 import threading
+from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import QLockFile, QObject, Qt, QTimer, Signal, Slot
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -24,7 +26,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from buddy.core.config import Config
+from buddy.core.config import Config, load_config
+from buddy.core.errors import BuddyError
 from buddy.ui.pet import LABELS, PetWidget, pet_icon
 from buddy.ui.runtime import DesktopRuntime
 from buddy.ui.settings import SettingsDialog
@@ -53,13 +56,26 @@ class ChatWindow(QWidget):
         self.controller = controller
         self.setWindowTitle("BUDDY · Your desktop friend")
         self.setWindowIcon(pet_icon())
-        self.resize(480, 570)
+        self.resize(520, 700)
         layout = QVBoxLayout(self)
-        heading = QLabel(
+        self.heading = QLabel(
             f"<h2>{html.escape(controller.config.pet.name)} "
             "<span style='color:#67e8ce'>●</span></h2>"
         )
-        layout.addWidget(heading)
+        layout.addWidget(self.heading)
+        self.setup_status = QLabel("Starting BUDDY…")
+        self.setup_status.setWordWrap(True)
+        layout.addWidget(self.setup_status)
+        setup = QHBoxLayout()
+        configure = QPushButton("Configure AI")
+        configure.clicked.connect(controller.settings)
+        self.prepare = QPushButton("Prepare voice")
+        self.prepare.clicked.connect(lambda: controller.runtime.submit("prepare_voice"))
+        self.demo = QCheckBox("Demo")
+        self.demo.toggled.connect(lambda checked: controller.runtime.submit("demo", checked))
+        for widget in (configure, self.prepare, self.demo):
+            setup.addWidget(widget)
+        layout.addLayout(setup)
         self.status = QLabel(LABELS["idle"])
         self.status.setObjectName("status")
         layout.addWidget(self.status)
@@ -134,6 +150,7 @@ class DesktopController(QObject):
         self.pet = PetWidget(config)
         self.chat = ChatWindow(self)
         self.chat.setStyleSheet(STYLE)
+        self.chat.setEnabled(False)
         self.menu = QMenu()
         self.menu.setStyleSheet(STYLE)
         self.menu.addAction("Show chat", self.show_chat)
@@ -191,13 +208,39 @@ class DesktopController(QObject):
         dialog = SettingsDialog(self.config, self.path, self.env_path, self.chat)
         dialog.setStyleSheet(STYLE)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            self.config = dialog.saved_config
-            self.chat.add("Settings", "Saved. Restart BUDDY to apply the new settings.")
+            try:
+                # Re-read the separate secrets file, not the dialog's stale Secrets object.
+                config = load_config(self.path, self.env_path if self.env_path.is_file() else None)
+                self.config = replace(config, data_dir=self.config.data_dir)
+            except BuddyError as error:
+                self.chat.add("Settings", str(error))
+                return
+            self.pet.apply_config(self.config)
+            self.chat.heading.setText("<h2>" + html.escape(self.config.pet.name) + "</h2>")
+            self.chat.input.setMaxLength(self.config.brain.max_input_chars)
+            self.runtime.submit("configure", self.config)
 
     @Slot(str, object)
     def receive_event(self, kind, payload):
         if kind == "ready":
             self.was_ready = True
+            self.chat.setEnabled(True)
+        elif kind == "mode":
+            self.chat.demo.blockSignals(True)
+            self.chat.demo.setChecked(payload["demo"])
+            self.chat.demo.blockSignals(False)
+            self.chat.setup_status.setText(
+                "Demo · canned replies; actions disabled"
+                if payload["demo"]
+                else (
+                    f"AI configured: {payload['provider']} · send a message to test access"
+                    if payload["configured"]
+                    else "Local mode · try ‘what time is it’ or ‘set a timer for 5 minutes’. "
+                    "Configure AI to chat freely."
+                )
+            )
+        elif kind == "voice_ready":
+            self.chat.prepare.setText("Voice ready ✓" if payload else "Prepare voice")
         elif kind == "state":
             self.pet.set_state(payload)
             label = LABELS.get(payload, payload)

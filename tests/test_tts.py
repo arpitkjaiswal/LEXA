@@ -26,7 +26,7 @@ def test_punctuation_free_text_is_bounded():
 
 
 async def test_fallback_is_local_and_cached(config, monkeypatch):
-    speech = SpeechOutput(config.tts, lambda _: None)
+    speech = SpeechOutput(replace(config.tts, backend="edge"), lambda _: None)
     calls = []
 
     async def edge(text):
@@ -44,7 +44,7 @@ async def test_fallback_is_local_and_cached(config, monkeypatch):
 
 
 async def test_interrupted_phrase_is_not_repeated_by_fallback(config, monkeypatch):
-    speech = SpeechOutput(config.tts, lambda _: None)
+    speech = SpeechOutput(replace(config.tts, backend="edge"), lambda _: None)
     fallback = []
 
     async def edge(text):

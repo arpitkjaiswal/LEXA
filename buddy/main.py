@@ -23,7 +23,7 @@ from buddy.core.platform_support import require_apple_silicon
 from buddy.core.reminders import Reminders
 from buddy.core.runner import TerminalRunner
 from buddy.core.storage import Store
-from buddy.core.stt import WhisperSTT
+from buddy.core.stt_process import ProcessSTT as WhisperSTT
 from buddy.core.tools import ToolRegistry
 from buddy.core.tts import SpeechOutput
 from buddy.core.wake import WakeDetector, download_models
@@ -69,6 +69,8 @@ def parser() -> argparse.ArgumentParser:
         choices=("install", "uninstall", "status"),
         help="Opt-in macOS login startup management",
     )
+    result.add_argument("--stt-worker", action="store_true", help=argparse.SUPPRESS)
+    result.add_argument("--voice-smoke-test", action="store_true", help=argparse.SUPPRESS)
     result.add_argument("--tts-worker", action="store_true", help=argparse.SUPPRESS)
     result.add_argument("--desktop-smoke-test", action="store_true", help=argparse.SUPPRESS)
     return result
@@ -101,6 +103,7 @@ async def run(args: argparse.Namespace) -> int:
     audit: AuditLog | None = None
     assistant: Assistant | None = None
     store: Store | None = None
+    stt = None
     try:
         audit = AuditLog(config)
         audit.record("startup", source="demo" if args.demo else "live", ok=True)
@@ -134,11 +137,12 @@ async def run(args: argparse.Namespace) -> int:
             console.write(
                 "Voice: Edge TTS (online). Set BUDDY_TTS_BACKEND=say for local macOS speech."
             )
+        stt = WhisperSTT(config.stt)
         runner = TerminalRunner(
             assistant,
             console,
             Microphone(config.audio),
-            WhisperSTT(config.stt),
+            stt,
             text_mode=args.text or args.once is not None,
             hotkey=GlobalPushToTalk(config.audio.hotkey)
             if args.ptt == "global" and not args.text and args.once is None
@@ -152,6 +156,8 @@ async def run(args: argparse.Namespace) -> int:
             await runner.run()
         return 0
     finally:
+        if stt and hasattr(stt, "close"):
+            await stt.close()
         if assistant:
             await assistant.close()
         else:
@@ -166,6 +172,14 @@ async def run(args: argparse.Namespace) -> int:
 def main() -> int:
     args = parser().parse_args()
     try:
+        if args.stt_worker:
+            from buddy.core.stt_process import worker_main
+
+            return worker_main()
+        if args.voice_smoke_test:
+            from buddy.build_tools.voice_smoke import check_voice
+
+            return asyncio.run(check_voice())
         if args.tts_worker:
             from buddy.core.tts import _worker
 

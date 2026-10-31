@@ -1,6 +1,6 @@
 # Validation
 
-Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 110 tests passed;
+Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 121 tests passed;
 Ruff lint/format and diff checks passed. The Qt smoke test rendered real widgets
 offscreen and closed the worker cleanly. CI results are tied to the exact commit in the PR.
 
@@ -27,6 +27,11 @@ The original 64 Phase 1 tests remain, with additional checks for:
 - Deleting saved history without recreating it through the confirmation turn.
 - Native-rate wake frames, consecutive detections and cancellation waiting for microphone closure.
 - Desktop mute during wake/capture and during speech; partial turns do not persist.
+- First-launch local timers, notes and memory without a provider, disabled-skill enforcement,
+  and local actions sharing the same exact approval rules.
+- Live provider/key reconfiguration, pending-approval revocation and demo switching.
+- Managed Whisper pipe framing, real child-process reuse, crashes/retry and cancellation
+  during a stalled model download; no abandoned inference/download thread blocks shutdown.
 - Real Qt widgets in a separate offscreen process: pet states, chat, settings, approval dialog,
   and complete worker shutdown, without a microphone or network request.
 - Settings/key separation, environment override synchronization and opt-in startup manifests.
@@ -36,7 +41,10 @@ The original 64 Phase 1 tests remain, with additional checks for:
 The companion CI runs checks on Ubuntu and native ARM64 macOS 15/current macOS with Python 3.11/3.12.
 The Apple Silicon packaging workflow explicitly builds arm64, audits every bundled Mach-O
 against the macOS 15.2 minimum, creates a ZIP/DMG, and smoke-tests the same packaged app on
-macOS 15 and the current macOS runner. Check the workflow result for the exact
+macOS 15 and the current macOS runner. The frozen app also downloads `tiny.en`,
+loads real faster-whisper/CTranslate2, and sends in-memory silence through PyAV/VAD
+in its managed subprocess. This verifies native model loading and the packaged pipe;
+it does not measure speech accuracy. Check the workflow result for the exact
 commit; a source test pass is not evidence of audible speech or real microphone recognition.
 
 ## Physical Mac acceptance
@@ -58,7 +66,7 @@ commit; a source test pass is not evidence of audible speech or real microphone 
 8. Test weather online/offline. Request a screenshot, cancel it, then explicitly approve another.
    Grant Screen Recording only for the approved capture. Verify only a local PNG is produced.
 9. Drag the pet across displays/Spaces, check always-on-top/reduced motion, tray visibility,
-   hide/show chat, settings restart and single-instance behavior.
+   hide/show chat, settings applying without restart and single-instance behavior.
 10. Explicitly install/status/uninstall the LaunchAgent from a logged-in desktop session.
     Verify the correct virtualenv/app launches and removal preserves data.
 11. Use the same Apple Silicon build on physical M1, M2, M3, M4 and M5-family devices as available.

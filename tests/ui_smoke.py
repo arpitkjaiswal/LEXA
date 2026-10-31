@@ -61,6 +61,20 @@ def smoke(directory: Path):
             settings.name.setText("BUDDY QA")
             settings.save()
             assert "BUDDY QA" in (directory / "config.yaml").read_text()
+
+            def fill_provider_settings():
+                dialog = app.activeModalWidget()
+                assert isinstance(dialog, SettingsDialog)
+                dialog.provider.setCurrentText("anthropic")
+                dialog.model.setText("test-model-no-network")
+                dialog.api_key.setText("test-key-never-sent")
+                dialog.save()
+
+            QTimer.singleShot(0, fill_provider_settings)
+            controller.settings()
+            assert controller.config.secrets.anthropic_api_key == "test-key-never-sent"
+            assert controller.config.brain.model == "test-model-no-network"
+            assert "test-key-never-sent" not in controller.chat.transcript.toPlainText()
             controller.confirm(
                 {"id": "test-only", "tool": "test action", "arguments": "{}", "seconds": 60}
             )

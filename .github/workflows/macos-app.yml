@@ -30,6 +30,8 @@ jobs:
         run: python -m buddy.build_tools.verify_macos dist/BUDDY.app --output dist/AppleSilicon-compatibility.json
       - name: Check the frozen app without a mic or API
         run: dist/BUDDY.app/Contents/MacOS/BUDDY --demo --no-tts --once "Hello BUDDY"
+      - name: Check the frozen local Whisper worker without a microphone
+        run: dist/BUDDY.app/Contents/MacOS/BUDDY --voice-smoke-test
       - name: Check the frozen desktop and clean worker shutdown
         run: dist/BUDDY.app/Contents/MacOS/BUDDY --desktop --demo --no-tts --desktop-smoke-test
       - name: Create Apple Silicon ZIP and drag-to-install DMG
@@ -64,3 +66,5 @@ jobs:
       - run: ditto -x -k BUDDY-AppleSilicon.zip extracted
       - run: extracted/BUDDY.app/Contents/MacOS/BUDDY --demo --no-tts --once "Hello Apple Silicon"
       - run: extracted/BUDDY.app/Contents/MacOS/BUDDY --desktop --demo --no-tts --desktop-smoke-test
+      - name: Check local Whisper in the same frozen app
+        run: extracted/BUDDY.app/Contents/MacOS/BUDDY --voice-smoke-test

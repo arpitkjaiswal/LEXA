@@ -30,7 +30,7 @@ stt:
   local_files_only: false  # true after downloading, for strict offline operation
 
 tts:
-  backend: edge      # edge | pyttsx3 | say (macOS) | piper | none
+  backend: say       # built-in macOS voice; edge | pyttsx3 | say | piper | none
   voice: en-IN-NeerjaNeural
   rate: +0%
   local_voice: ""    # optional installed pyttsx3 voice ID / macOS say voice name

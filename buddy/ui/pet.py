@@ -114,6 +114,16 @@ class PetWidget(QWidget):
         if not config.ui.reduced_motion:
             self.timer.start(40)
 
+    def apply_config(self, config: Config):
+        self.config = config
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, config.ui.always_on_top)
+        self.resize(round(270 * config.ui.scale), round(240 * config.ui.scale))
+        self.timer.stop()
+        if not config.ui.reduced_motion:
+            self.timer.start(40)
+        self.show()
+        self.update()
+
     def set_state(self, state: str):
         self.current_state = state
         self.update()

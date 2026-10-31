@@ -11,26 +11,16 @@ from typing import Any
 from buddy.core.assistant import Assistant, State
 from buddy.core.audio import Microphone
 from buddy.core.audit import AuditLog
-from buddy.core.brain import create_brain
+from buddy.core.brain import create_brain, provider_ready
 from buddy.core.config import Config
 from buddy.core.errors import BuddyError, ConfigurationError
+from buddy.core.local_brain import HELP, LocalBrain
 from buddy.core.reminders import Reminders
 from buddy.core.storage import Store
-from buddy.core.stt import WhisperSTT
+from buddy.core.stt_process import ProcessSTT as WhisperSTT
 from buddy.core.tools import ToolRegistry
 from buddy.core.tts import SpeechOutput
 from buddy.core.wake import WakeDetector, download_models
-
-
-class UnconfiguredBrain:
-    async def stream(self, messages, system):
-        raise ConfigurationError(
-            "Open Settings to choose a provider, model and API key, then restart BUDDY."
-        )
-        yield ""  # defines an async generator without constructing an SDK client
-
-    async def close(self):
-        pass
 
 
 class DesktopRuntime:
@@ -46,6 +36,7 @@ class DesktopRuntime:
         self.shutting_down = threading.Event()
         self.assistant: Assistant | None = None
         self.announcing = False
+        self.reconfiguring = False
 
     def submit(self, command: str, payload: Any = None) -> None:
         if command == "quit":
@@ -56,48 +47,16 @@ class DesktopRuntime:
 
     async def run(self) -> None:
         self.loop, self.queue = asyncio.get_running_loop(), asyncio.Queue()
-        audit = store = registry = brain = None
+        audit = store = None
         ticker = None
         try:
             audit = AuditLog(self.config)
             store = Store(self.config)
-            registry = ToolRegistry(self.config, audit, store)
-            try:
-                brain = create_brain(self.config, demo=self.demo)
-            except ConfigurationError as error:
-                brain = UnconfiguredBrain()
-                self.emit("notice", str(error))
-            self.assistant = Assistant(
-                self.config,
-                brain,
-                SpeechOutput(self.config.tts, lambda text: self.emit("notice", text)),
-                audit,
-                on_text=lambda text: None if self.announcing else self.emit("text", text),
-                on_state=lambda state: self.emit("state", state.value),
-                on_warning=lambda text: self.emit("notice", text),
-                tools=None if self.demo else registry,
-                store=store,
-            )
-            registry.on_pending = lambda pending: self.emit(
-                "confirmation",
-                {
-                    "id": pending.identifier,
-                    "tool": pending.tool,
-                    "arguments": pending.arguments,
-                    "seconds": self.config.skills.confirmation_seconds,
-                },
-            )
-            self.registry = registry
-            self.microphone, self.stt = Microphone(self.config.audio), WhisperSTT(self.config.stt)
-            self.detector, self.reminders = WakeDetector(self.config), Reminders(store)
+            self.audit, self.store = audit, store
+            self._install_services()
             ticker = asyncio.create_task(self._tick())
             self.emit("ready", None)
-            self.emit(
-                "notice",
-                "DEMO: canned replies; laptop actions are disabled."
-                if self.demo
-                else "Double-click BUDDY to talk, or type in the chat. Wake listening is opt-in.",
-            )
+            self._emit_mode()
             while not self.shutting_down.is_set():
                 command, payload = await self.queue.get()
                 try:
@@ -122,21 +81,108 @@ class DesktopRuntime:
             await self._stop()
             if self.assistant:
                 await self.assistant.close()
-            elif brain:
-                await brain.close()
-            if registry and (not self.assistant or self.demo):
+            registry = getattr(self, "registry", None)
+            if registry and (not self.assistant or self.assistant.tools is not registry):
                 await registry.close()
+            stt = getattr(self, "stt", None)
+            if stt and hasattr(stt, "close"):
+                await stt.close()
             if store:
                 store.close()
             if audit:
                 audit.close()
             self.emit("closed", None)
 
+    def _install_services(self):
+        self.registry = ToolRegistry(self.config, self.audit, self.store)
+        try:
+            brain = create_brain(self.config, demo=self.demo)
+        except ConfigurationError:
+            brain = LocalBrain(self.registry)
+        self.assistant = Assistant(
+            self.config,
+            brain,
+            SpeechOutput(self.config.tts, lambda text: self.emit("notice", text)),
+            self.audit,
+            on_text=lambda text: None if self.announcing else self.emit("text", text),
+            on_state=lambda state: self.emit("state", state.value),
+            on_warning=lambda text: self.emit("notice", text),
+            tools=None if self.demo else self.registry,
+            store=self.store,
+        )
+        self.registry.on_pending = lambda pending: self.emit(
+            "confirmation",
+            {
+                "id": pending.identifier,
+                "tool": pending.tool,
+                "arguments": pending.arguments,
+                "seconds": self.config.skills.confirmation_seconds,
+            },
+        )
+        self.microphone, self.stt = Microphone(self.config.audio), WhisperSTT(self.config.stt)
+        self.detector, self.reminders = WakeDetector(self.config), Reminders(self.store)
+
+    def _emit_mode(self):
+        self.emit(
+            "mode",
+            {
+                "demo": self.demo,
+                "configured": provider_ready(self.config),
+                "provider": self.config.brain.provider,
+            },
+        )
+        self.emit(
+            "notice",
+            "DEMO: canned replies; laptop actions are disabled."
+            if self.demo
+            else (
+                "AI configured. Type a message or use Prepare voice before Record."
+                if provider_ready(self.config)
+                else HELP
+            ),
+        )
+
+    async def _configure(self, config: Config, *, demo: bool):
+        if config.data_dir != self.config.data_dir:
+            raise ConfigurationError("Restart BUDDY to change its data directory.")
+        self.reconfiguring = True
+        try:
+            await self._pause_wake()
+            await self._stop()
+            muted = self.assistant.muted
+            await self.assistant.close()
+            if self.demo:
+                await self.registry.close()
+            if hasattr(self.stt, "close"):
+                await self.stt.close()
+            self.config, self.demo = config, demo
+            self.store.config = config.memory
+            self._install_services()
+            self.assistant.set_muted(muted)
+            self.emit("cancel_confirmations", None)
+            self.emit("voice_ready", False)
+            self._emit_mode()
+            self.emit(
+                "notice", "Settings applied. Current session context reloaded from saved history."
+            )
+        finally:
+            self.reconfiguring = False
+
     async def _handle(self, command: str, payload) -> None:
         assistant = self.assistant
         if command == "quit":
             return
-        if command == "mute":
+        if command == "configure":
+            await self._configure(payload, demo=self.demo)
+        elif command == "demo":
+            await self._configure(self.config, demo=bool(payload))
+        elif command == "prepare_voice":
+            if self.active:
+                self.emit("notice", "Stop the current turn before preparing voice.")
+                return
+            await self._pause_wake()
+            self._begin(self._prepare_voice())
+        elif command == "mute":
             assistant.set_muted(bool(payload))
             if payload:
                 await self._pause_wake()
@@ -240,9 +286,20 @@ class DesktopRuntime:
         await download_models(self.config)
         self.emit("notice", "Wake models downloaded. Enable wake-word listening in the menu.")
 
-    async def _voice(self, auto: bool) -> None:
-        self.emit("notice", "Preparing Whisper. Microphone is off until recording starts.")
+    async def _prepare_voice(self):
+        self.assistant.state(State.THINKING)
+        self.emit(
+            "notice",
+            "Preparing local Whisper; the first run downloads model weights. "
+            "Microphone is off. Stop reply cancels preparation.",
+        )
+        self.emit("voice_ready", False)
         await self.stt.prepare()
+        self.emit("voice_ready", True)
+        self.emit("notice", "Voice ready. Press Record, speak, then press Finish recording.")
+
+    async def _voice(self, auto: bool) -> None:
+        await self._prepare_voice()
         if self.assistant.muted:
             return
         self.capture_stop = threading.Event()
@@ -317,6 +374,8 @@ class DesktopRuntime:
     async def _tick(self) -> None:
         while not self.shutting_down.is_set():
             await asyncio.sleep(0.25)
+            if self.reconfiguring:
+                continue
             if self.registry.pending and self.registry.pending.expires < time.monotonic():
                 self.registry.cancel()
                 self.emit("cancel_confirmations", None)

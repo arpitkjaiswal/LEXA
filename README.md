@@ -29,25 +29,45 @@ The remaining companion features are implemented in source:
 | Desktop pet | Transparent, draggable, always on top; animated idle, listening, thinking, talking, happy, sleeping and approval states |
 | Voice | Local faster-whisper, optional openWakeWord, Record toggle and terminal/global PTT |
 | AI | Claude, OpenAI Responses, or a tool-capable local Ollama model |
-| Speech | Edge TTS with local pyttsx3 / macOS say fallbacks; optional Piper CLI |
+| Speech | Built-in macOS say by default; optional Edge, pyttsx3 or Piper |
 | Laptop controls | Launch allowlisted apps, browser search/HTTPS navigation, system volume, clock |
 | Music | yt-dlp search and one managed mpv player; pause, resume, next result, stop |
 | Memory | Explicitly saved preferences; optional retained chats; inspect and delete controls |
 | Productivity | SQLite notes, durable local timers/reminders, current weather, confirmed local screenshots |
-| Setup | Native settings, opt-in login startup, PyInstaller .app recipe and macOS build workflow |
+| Setup | No-key local commands, live settings, voice preparation, optional login startup, ARM64 ZIP/DMG |
 
 This is a development build. Physical microphone, wake-word accuracy, TCC permissions and
 clean installation still need the [Mac acceptance checks](docs/VALIDATION.md).
 Developer ID signing and notarization are not supplied.
 
-## Install on your Mac
+## Install the app (no Python needed)
+
+1. Open the latest successful [Apple Silicon build](https://github.com/arpitkjaiswal/LEXA/actions/workflows/macos-app.yml),
+   select the `codex/complete-macos-companion` branch run, and download the
+   **BUDDY-AppleSilicon-development** artifact. GitHub requires sign-in for artifact downloads.
+2. Extract the download, open **BUDDY-AppleSilicon.dmg**, and drag **BUDDY.app** into Applications.
+3. Open BUDDY from Applications on an Apple Silicon Mac running macOS 15.2 or newer.
+   This is an ad-hoc signed development app, without Developer ID notarization;
+   macOS may require explicit approval before launch.
+4. Type **what time is it** to test local mode immediately. Use **Configure AI** for
+   conversation, or tick **Demo** for clearly labelled canned replies.
+5. Press **Prepare voice** to cache and load Whisper. The first run needs internet and
+   enough space for the selected model. Choose `tiny` in Settings for a lighter download.
+   After **Voice ready**, press **Record**, grant Microphone access, speak, and press
+   **Finish recording**. Built-in macOS speech works without Homebrew players.
+
+Whisper and optional wake-model weights download separately; they are not embedded in the app.
+Music and optional Edge/Piper playback still need their external players.
+**Stop reply**, **Mute**, and **Quit** can interrupt Whisper preparation or transcription.
+
+## Run from source
 
 Use native ARM64 Python **3.11 or 3.12**, in a terminal running outside Rosetta.
 Apple Silicon Homebrew uses /opt/homebrew:
 
 ~~~bash
 brew install python@3.12 portaudio mpv yt-dlp
-git clone https://github.com/arpitkjaiswal/LEXA.git
+git clone --branch codex/complete-macos-companion https://github.com/arpitkjaiswal/LEXA.git
 cd LEXA
 /opt/homebrew/bin/python3.12 -m venv .venv
 source .venv/bin/activate
@@ -72,8 +92,9 @@ No administrator privileges are needed.
 python -m buddy --desktop
 ~~~
 
-The window opens even before an AI provider is configured. Open **Settings**, enter your
-name, choose a provider and exact model ID, optionally enter its API key, save, and restart.
+The window opens in local mode before an AI provider is configured. Open **Configure AI**,
+enter your name, choose a provider and exact model ID, optionally enter its API key, and save.
+Settings apply immediately; the active turn stops and session context reloads from saved history.
 Keys are saved separately in the local .env and are never displayed by the settings editor.
 
 | Provider | Configuration |
@@ -104,7 +125,16 @@ python -m buddy --desktop --demo --no-tts
 python -m buddy --demo --no-tts --once "Hello BUDDY"
 ~~~
 
-Demo replies are canned and **do not execute laptop actions**.
+The **Demo** checkbox switches modes without restarting. Demo replies are canned and
+**do not execute laptop actions**. Untick it to return to your provider or local mode.
+
+Without a provider, local mode accepts an explicit vocabulary: `what time is it`,
+`set a timer for 5 minutes`, `list reminders`, `cancel reminder ID`, `open calculator`,
+`open YouTube`, `search for QUERY`, `set volume to 40 percent`, `note TITLE: BODY`,
+`list notes`, `read note ID`, `delete note ID`, `remember KEY: VALUE`,
+`what do you remember`, and `take a screenshot`. IDs come from the local results.
+The same allowlist, validation and exact-action approvals apply. Other phrasing needs an AI
+provider; local mode explains the available commands instead of inventing a response.
 
 ## Wake-word listening
 
@@ -182,7 +212,8 @@ SQLite and .env use owner-only file permissions; they are not encrypted at rest.
 
 ## Local speech and terminal controls
 
-Set BUDDY_TTS_BACKEND=say for built-in macOS speech, or choose it in Settings.
+Built-in macOS `say` is the default for new installs; existing saved voice choices are preserved.
+Choose another engine in Settings or set BUDDY_TTS_BACKEND. Edge requires internet and mpv/ffplay.
 For Piper, install the Piper CLI separately, choose a local .onnx voice with its .onnx.json
 file alongside it, and set tts.piper_model and the matching tts.piper_sample_rate.
 The app streams raw Piper audio to mpv and does not download a voice silently.

@@ -1,9 +1,12 @@
 import asyncio
 from collections import defaultdict
+from dataclasses import replace
 
 from conftest import BrainDouble, SpeakerDouble
 
 from buddy.core.audio import RecordedAudio
+from buddy.core.config import Secrets
+from buddy.core.local_brain import LocalBrain
 from buddy.ui.runtime import DesktopRuntime
 
 
@@ -74,6 +77,62 @@ async def test_mute_closes_wake_and_live_capture_before_transcription(config, mo
         await asyncio.wait_for(capture_closed.wait(), 3)
         assert not wake_open and transcripts == []
         assert worker.assistant.muted
+    finally:
+        worker.submit("quit")
+        await asyncio.wait_for(task, 3)
+
+
+async def test_first_launch_and_settings_apply_new_key_without_restart(config, monkeypatch):
+    from buddy.ui import runtime as module
+
+    ready, configured, finished = (asyncio.Event() for _ in range(3))
+    received = []
+    brains = []
+    create = module.create_brain
+
+    def factory(value, *, demo=False):
+        if not value.secrets.anthropic_api_key:
+            return create(value, demo=demo)
+        received.append(value.secrets.anthropic_api_key)
+        brain = BrainDouble()
+        brains.append(brain)
+        return brain
+
+    monkeypatch.setattr(module, "create_brain", factory)
+    monkeypatch.setattr(module, "SpeechOutput", lambda *a: SpeakerDouble())
+
+    def emit(kind, payload):
+        if kind == "ready":
+            ready.set()
+        elif kind == "mode" and payload["configured"]:
+            configured.set()
+        elif kind == "turn_end":
+            finished.set()
+
+    initial = replace(config, secrets=Secrets())
+    worker = DesktopRuntime(initial, emit)
+    task = asyncio.create_task(worker.run())
+    try:
+        await asyncio.wait_for(ready.wait(), 3)
+        assert isinstance(worker.assistant.brain, LocalBrain)
+        worker.submit("text", "note First launch: local notes work")
+        await asyncio.wait_for(finished.wait(), 3)
+        assert worker.store.execute("SELECT title FROM notes")[0]["title"] == "First launch"
+        old_registry = worker.registry
+        await old_registry.invoke("take_screenshot", {})
+        assert old_registry.pending
+        worker.submit("configure", replace(config, secrets=Secrets("new-test-key", "")))
+        await asyncio.wait_for(configured.wait(), 3)
+        assert old_registry.pending is None and worker.registry is not old_registry
+        assert received == ["new-test-key"]
+        finished.clear()
+        worker.submit("text", "Hello from the configured provider")
+        await asyncio.wait_for(finished.wait(), 3)
+        assert brains[0].calls
+        configured.clear()
+        worker.submit("demo", True)
+        await asyncio.wait_for(configured.wait(), 3)
+        assert brains[0].closed and worker.assistant.tools is None
     finally:
         worker.submit("quit")
         await asyncio.wait_for(task, 3)

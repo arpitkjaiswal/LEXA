@@ -81,3 +81,17 @@ that verifies Qt startup and worker shutdown on the build OS and a newer macOS r
 CI produces one Apple Silicon ZIP/DMG; it does not produce an Intel artifact.
 Large voice/wake weights are downloaded separately.
 Login startup is installed only by an explicit --startup install command.
+
+## First launch and voice lifecycle
+
+The desktop falls back to an explicit local-command adapter when no model/key is configured.
+It recognizes entire commands and invokes the same schema-validated registry as an AI provider;
+unsupported text produces setup guidance. Demo remains a distinct mode with no tools.
+Saving settings reloads YAML and the separate credentials file, stops active work, revokes
+approvals, closes old services and installs the new configuration in the worker.
+
+Whisper runs in one managed child process, reused between voice turns. Bounded, length-prefixed
+JSON frames carry STT settings and base64 PCM over pipes; recorded audio stays in memory.
+Stop, mute, quit, timeout or worker failure kills and reaps the child. The next preparation
+starts a fresh worker, so a first-run network download cannot strand the GUI's asyncio executor.
+Whisper weight caches remain on disk; stopping a download does not erase the cache.

@@ -55,6 +55,10 @@ class SettingsDialog(QDialog):
         self.piper_rate = QSpinBox()
         self.piper_rate.setRange(8000, 48000)
         self.piper_rate.setValue(config.tts.piper_sample_rate)
+        self.stt_model = QComboBox()
+        self.stt_model.setEditable(True)
+        self.stt_model.addItems(["tiny", "base", "small", "medium"])
+        self.stt_model.setCurrentText(config.stt.model)
         self.wake_model = QLineEdit(config.wake.model)
         self.framework = QComboBox()
         self.framework.addItems(["auto", "onnx", "tflite"])
@@ -86,6 +90,7 @@ class SettingsDialog(QDialog):
             ("Local voice", self.local_voice),
             ("Piper model path", self.piper_model),
             ("Piper sample rate", self.piper_rate),
+            ("Whisper model / local path", self.stt_model),
             ("Wake model / trained path", self.wake_model),
             ("Wake framework", self.framework),
             ("Wake threshold", self.threshold),
@@ -99,7 +104,9 @@ class SettingsDialog(QDialog):
         scroll.setWidget(content)
         layout.addWidget(scroll)
         note = QLabel(
-            "Restart BUDDY after saving. Process environment variables take priority. "
+            "Save applies immediately and stops the current turn. "
+            "Choose a model ID from your provider account; Ollama needs a running server "
+            "and installed model. Process environment variables take priority. "
             "Retained chats and saved facts are sent as context "
             "to the chosen AI provider. Startup is managed separately with --startup."
         )
@@ -135,6 +142,7 @@ class SettingsDialog(QDialog):
                 piper_model=self.piper_model.text().strip(),
                 piper_sample_rate=self.piper_rate.value(),
             ),
+            stt=replace(self.config.stt, model=self.stt_model.currentText().strip()),
             wake=replace(
                 self.config.wake,
                 model=self.wake_model.text().strip(),
