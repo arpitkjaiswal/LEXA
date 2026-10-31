@@ -1,6 +1,6 @@
 # Validation
 
-Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 121 tests passed;
+Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 122 tests passed;
 Ruff lint/format and diff checks passed. The Qt smoke test rendered real widgets
 offscreen and closed the worker cleanly. CI results are tied to the exact commit in the PR.
 
@@ -32,6 +32,7 @@ The original 64 Phase 1 tests remain, with additional checks for:
 - Live provider/key reconfiguration, pending-approval revocation and demo switching.
 - Managed Whisper pipe framing, real child-process reuse, crashes/retry and cancellation
   during a stalled model download; no abandoned inference/download thread blocks shutdown.
+- A real worker process with windowed-app standard streams and noisy progress output.
 - Real Qt widgets in a separate offscreen process: pet states, chat, settings, approval dialog,
   and complete worker shutdown, without a microphone or network request.
 - Settings/key separation, environment override synchronization and opt-in startup manifests.

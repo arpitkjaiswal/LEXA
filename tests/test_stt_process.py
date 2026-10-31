@@ -73,6 +73,38 @@ async def test_stop_kills_a_worker_stalled_during_first_model_download(monkeypat
     await stt.close()
 
 
+async def test_real_worker_protocol_handles_windowed_app_streams_and_library_prints(monkeypatch):
+    real_spawn = asyncio.create_subprocess_exec
+    script = """
+import sys
+import buddy.core.stt as core
+from buddy.core.stt_process import worker_main
+class Model:
+    def __init__(self, config): pass
+    def _load(self):
+        print('library progress must not corrupt the protocol')
+        sys.stderr.write('progress requires a real writable stream')
+        sys.stderr.flush()
+    def _transcribe(self, audio):
+        assert audio.pcm == b'\\x00\\x00' * 20
+        return 'recognized words'
+core.WhisperSTT = Model
+sys.stdin = sys.stdout = sys.stderr = None
+raise SystemExit(worker_main())
+"""
+
+    async def spawn(*command, **kwargs):
+        return await real_spawn(sys.executable, "-u", "-c", script, **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", spawn)
+    stt = ProcessSTT(STTConfig())
+    try:
+        await stt.prepare()
+        assert await stt.transcribe(RecordedAudio(bytes(40), 16000)) == "recognized words"
+    finally:
+        await stt.close()
+
+
 async def test_crashed_worker_returns_safe_error_and_can_be_retried(monkeypatch):
     real_spawn = asyncio.create_subprocess_exec
     processes = []

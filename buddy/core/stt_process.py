@@ -12,7 +12,7 @@ import json
 import os
 import struct
 import sys
-from contextlib import suppress
+from contextlib import redirect_stderr, redirect_stdout, suppress
 from dataclasses import asdict
 
 from buddy.core.audio import RecordedAudio
@@ -132,8 +132,15 @@ def _read_frame(stream) -> dict | None:
 def worker_main() -> int:
     from buddy.core.stt import WhisperSTT
 
-    # Windowed PyInstaller apps have sys.stdin/sys.stdout set to None.
-    with os.fdopen(0, "rb", closefd=False) as source, os.fdopen(1, "wb", closefd=False) as sink:
+    # Windowed apps have Python's standard streams set to None. Give progress
+    # libraries a writable sink, and keep their output out of the framed pipe.
+    with (
+        open(os.devnull, "w") as quiet,
+        redirect_stdout(quiet),
+        redirect_stderr(quiet),
+        os.fdopen(0, "rb", closefd=False) as source,
+        os.fdopen(1, "wb", closefd=False) as sink,
+    ):
         try:
             request = _read_frame(source)
             if request is None:
