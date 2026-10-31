@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 from buddy.core.errors import ConfigurationError
 
-MIN_MACOS = (14, 0)
+MIN_MACOS = (14, 4)
 MIN_MACOS_VERSION = ".".join(map(str, MIN_MACOS))
 
 

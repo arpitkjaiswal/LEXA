@@ -1,6 +1,6 @@
 # Validation
 
-Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 109 tests passed;
+Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 110 tests passed;
 Ruff lint/format and diff checks passed. The Qt smoke test rendered real widgets
 offscreen and closed the worker cleanly. CI results are tied to the exact commit in the PR.
 
@@ -35,7 +35,7 @@ The original 64 Phase 1 tests remain, with additional checks for:
 
 The companion CI runs checks on Ubuntu and native ARM64 macOS 15/current macOS with Python 3.11/3.12.
 The Apple Silicon packaging workflow explicitly builds arm64, audits every bundled Mach-O
-against the macOS 14 minimum, creates a ZIP/DMG, and smoke-tests the same packaged app on
+against the macOS 14.4 minimum, creates a ZIP/DMG, and smoke-tests the same packaged app on
 macOS 15 and the current macOS runner. Check the workflow result for the exact
 commit; a source test pass is not evidence of audible speech or real microphone recognition.
 

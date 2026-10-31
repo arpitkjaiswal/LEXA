@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     env:
-      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.4"
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@v4
@@ -26,7 +26,7 @@ jobs:
           cache: pip
       - run: python -m pip install -e ".[voice,desktop,wake,music,package]"
       - run: python -m PyInstaller --clean --noconfirm packaging/BUDDY.spec
-      - name: Audit every bundled Mach-O for arm64 and macOS 14 compatibility
+      - name: Audit every bundled Mach-O for arm64 and macOS 14.4 compatibility
         run: python -m buddy.build_tools.verify_macos dist/BUDDY.app --output dist/AppleSilicon-compatibility.json
       - name: Check the frozen app without a mic or API
         run: dist/BUDDY.app/Contents/MacOS/BUDDY --demo --no-tts --once "Hello BUDDY"

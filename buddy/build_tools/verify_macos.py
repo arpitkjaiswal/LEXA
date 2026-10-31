@@ -77,22 +77,29 @@ def verify_bundle(app: Path, *, inspector=inspect_binary) -> dict:
     if not executable.is_file() or not is_macho(executable):
         raise ValueError("The app has no Mach-O entry executable.")
     baseline = (version_tuple(MIN_MACOS_VERSION) + (0, 0, 0))[:3]
-    binaries = []
+    binaries, problems = [], []
     for path in sorted(app.rglob("*")):
         if path.is_symlink() or not path.is_file() or not is_macho(path):
             continue
-        details = inspector(path)
+        try:
+            details = inspector(path)
+        except ValueError as error:
+            problems.append(f"{path.relative_to(app)}: {error}")
+            continue
         architectures = details["architectures"]
         if "arm64" not in architectures:
-            raise ValueError(f"Missing arm64 slice: {path.relative_to(app)}")
+            problems.append(f"Missing arm64 slice: {path.relative_to(app)}")
+            continue
         if path == executable and architectures != ["arm64"]:
-            raise ValueError("The app entry executable must be arm64 only.")
+            problems.append("The app entry executable must be arm64 only.")
         if (version_tuple(details["minimum_macos"]) + (0, 0, 0))[:3] > baseline:
-            raise ValueError(
+            problems.append(
                 f"{path.relative_to(app)} needs macOS {details['minimum_macos']}, "
                 f"above the {MIN_MACOS_VERSION} baseline."
             )
         binaries.append({"path": str(path.relative_to(app)), **details})
+    if problems:
+        raise ValueError("\n".join(problems))
     return {
         "app": app.name,
         "version": info.get("CFBundleShortVersionString", ""),
@@ -117,7 +124,10 @@ def main() -> int:
         manifest = verify_bundle(args.app)
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(json.dumps(manifest, indent=2) + "\n")
-        print(f"Verified {manifest['verified_binary_count']} arm64 binaries; macOS 14+ baseline.")
+        print(
+            f"Verified {manifest['verified_binary_count']} arm64 binaries; "
+            f"macOS {MIN_MACOS_VERSION}+ baseline."
+        )
         return 0
     except (BuddyError, ValueError, OSError, subprocess.SubprocessError) as error:
         parser.exit(1, f"Apple Silicon bundle verification failed: {error}\n")
