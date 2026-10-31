@@ -51,6 +51,7 @@ class SpeechOutput:
         self.config = config
         self.warning = warning
         self._process: asyncio.subprocess.Process | None = None
+        self._synth: asyncio.subprocess.Process | None = None
         self._selected = config.backend
         self._warned: set[str] = set()
 
@@ -68,6 +69,8 @@ class SpeechOutput:
                         await self._pyttsx3(text)
                     elif backend == "say":
                         await self._say(text)
+                    elif backend == "piper":
+                        await self._piper(text)
                     else:
                         raise SpeechError("Unknown speech backend.")
                 self._selected = backend
@@ -154,7 +157,68 @@ class SpeechOutput:
         ).encode("utf-8")
         # OS voice engines need a main thread/run loop on macOS. Isolate that engine
         # in a child process instead of running Cocoa in an asyncio worker thread.
-        await self._run_local([sys.executable, "-m", "buddy.core.tts", "--worker"], payload)
+        command = (
+            [sys.executable, "--tts-worker"]
+            if getattr(sys, "frozen", False)
+            else [sys.executable, "-m", "buddy.core.tts", "--worker"]
+        )
+        await self._run_local(command, payload)
+
+    async def _piper(self, text: str) -> None:
+        from pathlib import Path
+
+        executable, player = shutil.which("piper"), shutil.which("mpv")
+        if (
+            not executable
+            or not player
+            or not await asyncio.to_thread(Path(self.config.piper_model).is_file)
+        ):
+            raise SpeechError("Piper needs its CLI, a local tts.piper_model and mpv.")
+        self._synth = await asyncio.create_subprocess_exec(
+            executable,
+            "--model",
+            self.config.piper_model,
+            "--output-raw",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        self._process = await asyncio.create_subprocess_exec(
+            player,
+            "--no-config",
+            "--no-terminal",
+            "--really-quiet",
+            "--no-video",
+            "--demuxer=rawaudio",
+            "--demuxer-rawaudio-format=s16le",
+            "--demuxer-rawaudio-channels=mono",
+            f"--demuxer-rawaudio-rate={self.config.piper_sample_rate}",
+            "-",
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        synth, output = self._synth, self._process
+        assert synth.stdin and synth.stdout and output.stdin
+        synth.stdin.write((text + "\n").encode())
+        await synth.stdin.drain()
+        synth.stdin.close()
+        received = False
+        try:
+            while chunk := await synth.stdout.read(65536):
+                received = True
+                output.stdin.write(chunk)
+                await output.stdin.drain()
+            output.stdin.close()
+            await output.stdin.wait_closed()
+            if await synth.wait() or await output.wait() or not received:
+                raise SpeechError("Piper playback failed.")
+        except Exception:
+            await self.stop()
+            if received:
+                raise SpeechInterruptedError("Piper speech was interrupted.") from None
+            raise
+        self._synth = self._process = None
 
     async def _run_local(self, args: list[str], payload: bytes) -> None:
         self._process = await asyncio.create_subprocess_exec(
@@ -170,20 +234,25 @@ class SpeechOutput:
         self._process = None
 
     async def stop(self) -> None:
-        process, self._process = self._process, None
-        if process and process.returncode is None:
-            try:
-                process.kill()
-            except ProcessLookupError:
-                pass
-            await process.wait()
+        children = (self._process, self._synth)
+        self._process = self._synth = None
+        for process in children:
+            if process and process.returncode is None:
+                try:
+                    process.kill()
+                except ProcessLookupError:
+                    pass
+                await process.wait()
 
 
 def _worker() -> int:
     try:
+        import os
+
         import pyttsx3
 
-        payload: dict[str, Any] = json.loads(sys.stdin.buffer.read(100_000))
+        source = sys.stdin.buffer if sys.stdin is not None else os.fdopen(0, "rb", closefd=False)
+        payload: dict[str, Any] = json.loads(source.read(100_000))
         engine = pyttsx3.init()
         engine.setProperty("rate", int(payload["rate"]))
         if payload.get("voice"):

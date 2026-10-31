@@ -1,4 +1,4 @@
-name: Phase 1 checks
+name: Companion checks
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install -e ".[dev]" numpy
+      - run: python -m pip install -e ".[dev,desktop]" numpy scipy
       - run: python -m ruff check .
       - run: python -m ruff format --check .
       - run: python -m pytest -q

@@ -1,1 +1,1 @@
-"""Reserved for Phase 2. No laptop actions are enabled in the Phase 1 MVP."""
+"""Built-in skill modules, loaded only through the fixed allowlisted registry."""

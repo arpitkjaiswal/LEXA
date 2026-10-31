@@ -61,6 +61,8 @@ class TTSConfig:
     local_rate: int = 180
     fallback: list[str] = field(default_factory=lambda: ["pyttsx3", "say"])
     timeout_seconds: float = 45
+    piper_model: str = ""
+    piper_sample_rate: int = 22050
 
 
 @dataclass(frozen=True)
@@ -68,6 +70,61 @@ class LogConfig:
     enabled: bool = True
     max_bytes: int = 1_000_000
     backups: int = 3
+
+
+@dataclass(frozen=True)
+class WakeConfig:
+    model: str = "hey_jarvis"
+    framework: str = "auto"
+    threshold: float = 0.5
+    consecutive_frames: int = 2
+    silence_seconds: float = 1.2
+
+
+@dataclass(frozen=True)
+class SkillsConfig:
+    enabled: list[str] = field(
+        default_factory=lambda: [
+            "apps",
+            "web",
+            "system",
+            "music",
+            "timers",
+            "notes",
+            "memory",
+            "weather",
+            "screenshot",
+        ]
+    )
+    confirmation_seconds: int = 60
+    apps: dict[str, str] = field(
+        default_factory=lambda: {
+            "vscode": "com.microsoft.VSCode",
+            "safari": "com.apple.Safari",
+            "music": "com.apple.Music",
+            "spotify": "com.spotify.client",
+            "calculator": "com.apple.calculator",
+            "notes": "com.apple.Notes",
+        }
+    )
+    web_domains: list[str] = field(
+        default_factory=lambda: ["youtube.com", "google.com", "github.com", "wikipedia.org"]
+    )
+
+
+@dataclass(frozen=True)
+class MemoryConfig:
+    enabled: bool = True
+    save_history: bool = False
+    history_turns: int = 50
+    timezone: str = ""  # empty uses the system zone; reminder timestamps require an offset
+
+
+@dataclass(frozen=True)
+class UIConfig:
+    scale: float = 1.0
+    always_on_top: bool = True
+    reduced_motion: bool = False
 
 
 @dataclass(frozen=True)
@@ -92,6 +149,10 @@ class Config:
     stt: STTConfig = field(default_factory=STTConfig)
     tts: TTSConfig = field(default_factory=TTSConfig)
     logging: LogConfig = field(default_factory=LogConfig)
+    wake: WakeConfig = field(default_factory=WakeConfig)
+    skills: SkillsConfig = field(default_factory=SkillsConfig)
+    memory: MemoryConfig = field(default_factory=MemoryConfig)
+    ui: UIConfig = field(default_factory=UIConfig)
     secrets: Secrets = field(default_factory=Secrets, repr=False)
     data_dir: Path = field(default_factory=default_data_dir)
 
@@ -122,7 +183,7 @@ def _number(value: Any, name: str, low: float, high: float, *, integer: bool = F
 
 
 def validate(config: Config) -> None:
-    for section_name in ("pet", "brain", "audio", "stt", "tts"):
+    for section_name in ("pet", "brain", "audio", "stt", "tts", "wake", "memory", "ui"):
         section = getattr(config, section_name)
         for item in fields(section):
             value = getattr(section, item.name)
@@ -135,12 +196,12 @@ def validate(config: Config) -> None:
     if not config.pet.name.strip() or not config.pet.user_name.strip():
         raise ConfigurationError("pet.name and pet.user_name cannot be blank.")
     if not isinstance(config.tts.fallback, list) or any(
-        not isinstance(backend, str) or backend not in {"pyttsx3", "say"}
+        not isinstance(backend, str) or backend not in {"pyttsx3", "say", "piper"}
         for backend in config.tts.fallback
     ):
-        raise ConfigurationError("tts.fallback must contain only local backends: pyttsx3 or say.")
-    if config.tts.backend not in {"edge", "pyttsx3", "say", "none"}:
-        raise ConfigurationError("tts.backend must be edge, pyttsx3, say or none.")
+        raise ConfigurationError("tts.fallback must contain local backends: pyttsx3, say or piper.")
+    if config.tts.backend not in {"edge", "pyttsx3", "say", "piper", "none"}:
+        raise ConfigurationError("tts.backend must be edge, pyttsx3, say, piper or none.")
     if config.audio.device is not None and type(config.audio.device) not in (str, int):
         raise ConfigurationError("audio.device must be an index, device name or null.")
     if config.stt.language is not None and not isinstance(config.stt.language, str):
@@ -159,8 +220,10 @@ def validate(config: Config) -> None:
     _number(config.audio.silence_rms, "audio.silence_rms", 0, 1)
     _number(config.tts.local_rate, "tts.local_rate", 50, 400, integer=True)
     _number(config.tts.timeout_seconds, "tts.timeout_seconds", 1, 180)
+    _number(config.tts.piper_sample_rate, "tts.piper_sample_rate", 8000, 48000, integer=True)
     _number(config.logging.max_bytes, "logging.max_bytes", 1024, 50_000_000, integer=True)
     _number(config.logging.backups, "logging.backups", 0, 10, integer=True)
+    validate_extensions(config)
     endpoint = urlparse(config.brain.ollama_base_url)
     if (
         endpoint.scheme not in {"http", "https"}
@@ -185,7 +248,18 @@ def load_config(path: Path | None = None, env_file: Path | None = None) -> Confi
         raw = {} if raw is None else raw
         if not isinstance(raw, dict):
             raise ConfigurationError("config.yaml must contain a mapping.")
-        if set(raw) - {"pet", "brain", "audio", "stt", "tts", "logging"}:
+        if set(raw) - {
+            "pet",
+            "brain",
+            "audio",
+            "stt",
+            "tts",
+            "logging",
+            "wake",
+            "skills",
+            "memory",
+            "ui",
+        }:
             raise ConfigurationError("config.yaml contains an unknown section.")
         dotenv_path = env_file or config_path.parent / ".env"
         if env_file is not None and not env_file.is_file():
@@ -219,8 +293,65 @@ def load_config(path: Path | None = None, env_file: Path | None = None) -> Confi
         stt=_section(STTConfig, raw.get("stt"), "stt"),
         tts=_section(TTSConfig, sections["tts"], "tts"),
         logging=_section(LogConfig, raw.get("logging"), "logging"),
+        wake=_section(WakeConfig, raw.get("wake"), "wake"),
+        skills=_section(SkillsConfig, raw.get("skills"), "skills"),
+        memory=_section(MemoryConfig, raw.get("memory"), "memory"),
+        ui=_section(UIConfig, raw.get("ui"), "ui"),
         secrets=Secrets(env.get("ANTHROPIC_API_KEY") or "", env.get("OPENAI_API_KEY") or ""),
         data_dir=Path(env.get("BUDDY_DATA_DIR") or default_data_dir()).expanduser().resolve(),
     )
     validate(config)
     return config
+
+
+def validate_extensions(config: Config) -> None:
+    import re
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+    if config.wake.framework not in {"auto", "onnx", "tflite"}:
+        raise ConfigurationError("wake.framework must be auto, onnx or tflite.")
+    if not config.wake.model.strip():
+        raise ConfigurationError("wake.model must identify a trained model.")
+    _number(config.wake.threshold, "wake.threshold", 0.01, 1)
+    _number(config.wake.consecutive_frames, "wake.consecutive_frames", 1, 10, integer=True)
+    _number(config.wake.silence_seconds, "wake.silence_seconds", 0.4, 5)
+    _number(
+        config.skills.confirmation_seconds, "skills.confirmation_seconds", 10, 300, integer=True
+    )
+    _number(config.memory.history_turns, "memory.history_turns", 1, 1000, integer=True)
+    _number(config.ui.scale, "ui.scale", 0.6, 2)
+    for value in (
+        config.memory.enabled,
+        config.memory.save_history,
+        config.ui.always_on_top,
+        config.ui.reduced_motion,
+    ):
+        if type(value) is not bool:
+            raise ConfigurationError("Memory and UI switches must be true or false.")
+    known = {"apps", "web", "system", "music", "timers", "notes", "memory", "weather", "screenshot"}
+    if not isinstance(config.skills.enabled, list) or any(
+        not isinstance(x, str) or x not in known for x in config.skills.enabled
+    ):
+        raise ConfigurationError("skills.enabled must contain built-in skill module names.")
+    if (
+        not isinstance(config.skills.apps, dict)
+        or len(config.skills.apps) > 100
+        or any(
+            not isinstance(k, str)
+            or not re.fullmatch(r"[a-z0-9_ -]{1,40}", k)
+            or not isinstance(v, str)
+            or not re.fullmatch(r"[A-Za-z0-9.-]{3,150}", v)
+            for k, v in config.skills.apps.items()
+        )
+    ):
+        raise ConfigurationError("skills.apps must map short aliases to macOS bundle identifiers.")
+    if not isinstance(config.skills.web_domains, list) or any(
+        not isinstance(v, str) or not re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]{0,250})\.[a-z]{2,63}", v)
+        for v in config.skills.web_domains
+    ):
+        raise ConfigurationError("skills.web_domains must contain domain names only.")
+    if config.memory.timezone:
+        try:
+            ZoneInfo(config.memory.timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            raise ConfigurationError("memory.timezone must be an IANA timezone.") from None

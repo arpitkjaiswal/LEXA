@@ -81,6 +81,13 @@ async def test_text_mode_never_loads_stt_or_opens_mic(config):
     assert runner.assistant.history[0]["content"] == "hello"
 
 
+async def test_typed_confirmation_in_voice_mode_never_opens_mic(config):
+    runner = build(config, ["/confirm wrong-token", "/quit"])
+    await runner.run()
+    assert runner.microphone.calls == 0
+    assert runner.stt.calls == 0
+
+
 async def test_time_cap_cancels_pending_input(config):
     import threading
 

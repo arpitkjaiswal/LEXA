@@ -10,7 +10,7 @@ brain:
   model: ""           # or set BUDDY_MODEL in .env
   max_output_tokens: 512
   timeout_seconds: 45
-  history_turns: 10    # RAM only in Phase 1; /reset clears it
+  history_turns: 10    # active context; optional disk retention is configured under memory
   max_input_chars: 6000
   ollama_base_url: http://127.0.0.1:11434
 
@@ -30,13 +30,45 @@ stt:
   local_files_only: false  # true after downloading, for strict offline operation
 
 tts:
-  backend: edge      # edge | pyttsx3 | say (macOS) | none
+  backend: edge      # edge | pyttsx3 | say (macOS) | piper | none
   voice: en-IN-NeerjaNeural
   rate: +0%
   local_voice: ""    # optional installed pyttsx3 voice ID / macOS say voice name
   local_rate: 180
   fallback: [pyttsx3, say] # local backends only; never silently upload to another TTS
   timeout_seconds: 45
+  piper_model: ""     # absolute path to a separately downloaded Piper .onnx voice
+  piper_sample_rate: 22050  # must match the voice's .onnx.json sample_rate
+
+wake:
+  model: hey_jarvis   # built-in trained phrase; arbitrary text is not a wake model
+  framework: auto    # LiteRT/TFLite on Apple Silicon; ONNX on other targets
+  threshold: 0.5
+  consecutive_frames: 2
+  silence_seconds: 1.2
+
+skills:
+  enabled: [apps, web, system, music, timers, notes, memory, weather, screenshot]
+  confirmation_seconds: 60
+  apps:              # only these bundle IDs can be launched
+    vscode: com.microsoft.VSCode
+    safari: com.apple.Safari
+    music: com.apple.Music
+    spotify: com.spotify.client
+    calculator: com.apple.calculator
+    notes: com.apple.Notes
+  web_domains: [youtube.com, google.com, github.com, wikipedia.org]
+
+memory:
+  enabled: true      # only explicit "remember this" requests save facts
+  save_history: false  # opt in through Settings to retain previous chats
+  history_turns: 50
+  timezone: ""       # system zone; use Asia/Kolkata to pin your home timezone
+
+ui:
+  scale: 1.0
+  always_on_top: true
+  reduced_motion: false
 
 logging:
   enabled: true

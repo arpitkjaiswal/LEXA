@@ -1,2 +1,2 @@
-# macOS voice MVP; install from the repository root in a virtual environment.
--e .[voice]
+# macOS desktop and voice; wake listening is an optional separate extra.
+-e .[voice,desktop,music]
