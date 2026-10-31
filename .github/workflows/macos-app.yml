@@ -15,9 +15,10 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: "14.0"
       QT_QPA_PLATFORM: offscreen
-      BUDDY_DATA_DIR: ${{ runner.temp }}/buddy-build-smoke
     steps:
       - uses: actions/checkout@v4
+      - name: Isolate smoke-test data
+        run: echo "BUDDY_DATA_DIR=$RUNNER_TEMP/buddy-build-smoke" >> "$GITHUB_ENV"
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -54,8 +55,9 @@ jobs:
     timeout-minutes: 10
     env:
       QT_QPA_PLATFORM: offscreen
-      BUDDY_DATA_DIR: ${{ runner.temp }}/buddy-newer-macos-smoke
     steps:
+      - name: Isolate smoke-test data
+        run: echo "BUDDY_DATA_DIR=$RUNNER_TEMP/buddy-newer-macos-smoke" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@v4
         with:
           name: BUDDY-AppleSilicon-development
