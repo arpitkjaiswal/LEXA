@@ -25,6 +25,8 @@ jobs:
           architecture: arm64
           cache: pip
       - run: python -m pip install -e ".[voice,desktop,wake,music,package]"
+      - name: Check local Whisper audio decoding and VAD before packaging
+        run: python -m buddy.build_tools.voice_smoke
       - run: python -m PyInstaller --clean --noconfirm packaging/BUDDY.spec
       - name: Audit every bundled Mach-O for arm64 and macOS 15.2 compatibility
         run: python -m buddy.build_tools.verify_macos dist/BUDDY.app --output dist/AppleSilicon-compatibility.json

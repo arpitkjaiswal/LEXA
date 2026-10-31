@@ -15,7 +15,7 @@ async def check_voice() -> int:
         text = await stt.transcribe(RecordedAudio(bytes(16000 * 2 * 2), 16000))
         if text.strip():
             return 1
-        print("Frozen local Whisper, PyAV and VAD smoke passed; no microphone opened.")
+        print("Local Whisper, PyAV and VAD smoke passed; no microphone opened.")
         return 0
     finally:
         await stt.close()

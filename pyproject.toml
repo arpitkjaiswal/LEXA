@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 voice = [
   "faster-whisper>=1.1,<2",
+  "av==18.1.0", # faster-whisper uses metadata_errors, removed by PyAV 19
   "sounddevice>=0.5,<1",
   "numpy>=1.26,<3",
   "edge-tts>=7,<8",

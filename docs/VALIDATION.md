@@ -43,10 +43,11 @@ The original 64 Phase 1 tests remain, with additional checks for:
 The companion CI runs checks on Ubuntu and native ARM64 macOS 15/current macOS with Python 3.11/3.12.
 The Apple Silicon packaging workflow explicitly builds arm64, audits every bundled Mach-O
 against the macOS 15.2 minimum, creates a ZIP/DMG, and smoke-tests the same packaged app on
-macOS 15 and the current macOS runner. The frozen app also downloads `tiny.en`,
+macOS 15 and the current macOS runner. Source and frozen voice checks download `tiny.en`,
 loads real faster-whisper/CTranslate2, and sends in-memory silence through PyAV/VAD
 in its managed subprocess. This verifies native model loading and the packaged pipe;
-it does not measure speech accuracy. Check the workflow result for the exact
+it does not measure speech accuracy. PyAV 18.1.0 is pinned after reproducing PyAV 19’s
+incompatible removal of the decoder’s metadata_errors argument. Check the workflow result for the exact
 commit; a source test pass is not evidence of audible speech or real microphone recognition.
 
 ## Physical Mac acceptance

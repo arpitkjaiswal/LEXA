@@ -16,6 +16,8 @@ so compatible future arm64 Macs are not blocked. Intel/Rosetta builds are no lon
 CI audits the app executable and every bundled Mach-O dependency for an arm64 slice and
 a deployment target no newer than macOS 15.2. Qt 6.11.3 and LiteRT 2.3.0 are pinned
 to their verified binary requirements; re-run the audit before changing these versions.
+PyAV 18.1.0 is pinned because faster-whisper’s decoder uses the metadata_errors argument
+removed in PyAV 19. The workflow checks real audio decoding/VAD before and after packaging.
 The same built app is smoke-tested on macOS 15
 and the current macOS runner. This is architecture/OS validation, not physical testing of
 every M-series model; microphone and wake-word accuracy need on-device acceptance.
