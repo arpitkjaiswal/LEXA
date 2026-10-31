@@ -1,10 +1,22 @@
 # BUDDY · LEXA
 
-A talking desktop friend for **macOS**, built in Python. BUDDY sits above your windows,
+A talking desktop friend for **Apple Silicon Macs**, built in Python. BUDDY sits above your windows,
 listens when you enable a wake word or press Record, chats with you, and runs requested
 laptop actions through an allowlist.
 
 **LEXA** is the repository name. **BUDDY** is the default companion name; change it in Settings.
+
+## Apple Silicon target
+
+One native **arm64** app targets **M1, M2, M3, M4 and M5** families, including their
+Pro/Max/Ultra variants where available. The baseline is **macOS 14 Sonoma or later**.
+The runtime checks the ABI and OS version rather than maintaining a chip-name allowlist,
+so compatible future arm64 Macs are not blocked. Intel/Rosetta builds are no longer shipped.
+
+CI audits the app executable and every bundled Mach-O dependency for an arm64 slice and
+a deployment target no newer than macOS 14. The same built app is smoke-tested on macOS 15
+and the current macOS runner. This is architecture/OS validation, not physical testing of
+every M-series model; microphone and wake-word accuracy need on-device acceptance.
 
 ## Development release 0.2
 
@@ -28,14 +40,16 @@ Developer ID signing and notarization are not supplied.
 
 ## Install on your Mac
 
-Use Python **3.11 or 3.12**, in a virtual environment:
+Use native ARM64 Python **3.11 or 3.12**, in a terminal running outside Rosetta.
+Apple Silicon Homebrew uses /opt/homebrew:
 
 ~~~bash
 brew install python@3.12 portaudio mpv yt-dlp
 git clone https://github.com/arpitkjaiswal/LEXA.git
 cd LEXA
-python3.12 -m venv .venv
+/opt/homebrew/bin/python3.12 -m venv .venv
 source .venv/bin/activate
+python -c "import platform; assert platform.machine() == 'arm64', 'Use native ARM64 Python'"
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 cp .env.example .env
@@ -205,17 +219,21 @@ python -m buddy --startup uninstall
 The per-user LaunchAgent preserves your selected virtualenv interpreter and explicit config paths.
 Uninstalling startup preserves notes, memory and settings.
 
-Build on the Mac architecture you want to distribute:
+Build on an Apple Silicon Mac using native ARM64 Python:
 
 ~~~bash
 python -m pip install -e ".[voice,desktop,wake,music,package]"
 python -m PyInstaller --clean --noconfirm packaging/BUDDY.spec
+python -m buddy.build_tools.verify_macos dist/BUDDY.app --output dist/AppleSilicon-compatibility.json
 open dist/BUDDY.app
 ~~~
 
-The GitHub **Build macOS app** workflow produces development app ZIP artifacts.
-Whisper/wake/Piper weights and Homebrew players are separate; this is not a universal self-contained
-installer. Finder launches use a private user config in Application Support, never bundled API keys.
+The GitHub **Build Apple Silicon app** workflow produces one development download containing
+**BUDDY-AppleSilicon.zip**, a **BUDDY-AppleSilicon.dmg** drag-to-Applications installer,
+and **AppleSilicon-compatibility.json** with the native binary audit. Use this same download
+for M1–M5; there is no separate Intel package.
+Whisper/wake/Piper weights and Homebrew players are separate dependencies.
+Finder launches use a private user config in Application Support, never bundled API keys.
 A Developer ID identity, notarization and clean Mac permission/installation checks are still
 required before a public signed release.
 
@@ -230,3 +248,6 @@ python -m pytest -q
 
 See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md),
 [validation and physical checks](docs/VALIDATION.md), and [security](SECURITY.md).
+
+Linux is used only for development checks; the shipped desktop/voice entry points require
+native arm64 macOS 14+. Text/demo/doctor commands and offscreen Qt tests remain usable for development.

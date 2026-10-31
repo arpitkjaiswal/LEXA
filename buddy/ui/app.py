@@ -127,6 +127,7 @@ class DesktopController(QObject):
     def __init__(self, app, config: Config, path: Path, env_path: Path, *, demo=False, wake=False):
         super().__init__()
         self.app, self.config, self.path, self.env_path = app, config, path, env_path
+        self.was_ready, self.fatal_error = False, False
         self.bridge = Bridge()
         self.bridge.event.connect(self.receive_event, Qt.ConnectionType.QueuedConnection)
         self.runtime = DesktopRuntime(config, self.bridge.event.emit, demo=demo, wake=wake)
@@ -195,7 +196,9 @@ class DesktopController(QObject):
 
     @Slot(str, object)
     def receive_event(self, kind, payload):
-        if kind == "state":
+        if kind == "ready":
+            self.was_ready = True
+        elif kind == "state":
             self.pet.set_state(payload)
             label = LABELS.get(payload, payload)
             self.chat.status.setText(label)
@@ -227,6 +230,7 @@ class DesktopController(QObject):
         elif kind in {"notice", "fatal"}:
             self.chat.add("BUDDY", str(payload))
             if kind == "fatal":
+                self.fatal_error = True
                 self.show_chat()
         elif kind == "wake_enabled":
             self.wake_action.blockSignals(True)
@@ -317,7 +321,9 @@ class DesktopController(QObject):
             self.app.quit()
 
 
-def run_desktop(config: Config, path: Path, env_path: Path, *, demo=False, wake=False) -> int:
+def run_desktop(
+    config: Config, path: Path, env_path: Path, *, demo=False, wake=False, smoke_test=False
+) -> int:
     app = QApplication.instance() or QApplication([])
     app.setApplicationName("BUDDY")
     app.setQuitOnLastWindowClosed(False)
@@ -329,9 +335,15 @@ def run_desktop(config: Config, path: Path, env_path: Path, *, demo=False, wake=
         )
         return 1
     controller = DesktopController(app, config, path, env_path, demo=demo, wake=wake)
+    if smoke_test:
+        QTimer.singleShot(1500, controller.quit)
     # Keep controller and lock alive for the full Qt event loop.
     result = app.exec()
     controller.runtime.submit("quit")
     controller.thread.join(10)
     lock.unlock()
+    if smoke_test and (
+        not controller.was_ready or controller.fatal_error or controller.thread.is_alive()
+    ):
+        return 1
     return result

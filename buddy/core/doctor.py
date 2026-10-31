@@ -9,12 +9,15 @@ import sys
 
 from buddy.core.brain import provider_ready
 from buddy.core.config import Config
+from buddy.core.platform_support import host_support
 
 
 def report(config: Config) -> list[str]:
     lines = [
         f"BUDDY | Python {platform.python_version()} | {platform.system()} {platform.machine()}",
-        "Target: macOS. This check does not request permissions or contact AI services.",
+        "Target: Apple Silicon M1–M5 and compatible arm64 successors, macOS 14+.",
+        host_support().message,
+        "This check does not request permissions or contact AI services.",
         f"LLM provider: {config.brain.provider}",
         f"LLM model: {'configured' if config.brain.model.strip() else 'MISSING: set BUDDY_MODEL'}",
         f"LLM credentials: {'configured / not needed' if provider_ready(config) else 'NOT READY'}",

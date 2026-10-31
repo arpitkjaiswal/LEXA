@@ -34,6 +34,7 @@ def test_login_startup_is_explicit_preserves_venv_path_and_uninstalls(
     monkeypatch.setattr(module.Path, "home", lambda: home)
     monkeypatch.setattr(module.sys, "platform", "darwin")
     monkeypatch.setattr(module.sys, "executable", str(tmp_path / ".venv/bin/python"))
+    monkeypatch.setattr(module, "require_apple_silicon", lambda: None)
     calls = []
 
     def run(command, **kwargs):

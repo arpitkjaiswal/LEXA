@@ -56,6 +56,11 @@ The metadata audit log excludes audio, text, tool arguments/results and credenti
 
 ## Desktop and distribution
 
+The distribution target is native arm64 macOS 14+, covering the M1–M5 families with one ABI.
+Desktop/voice startup checks the process architecture and OS version before audio or GUI
+initialization. Rosetta/x86_64 receives an actionable native-Python diagnostic. The check
+does not reject future compatible chips by model name.
+
 The pet is drawn and animated with QPainter, without art downloads. Frame painting never
 makes network or OS-control calls. The chat panel, tray, settings, memory viewer and approval
 dialogs remain responsive while the async worker runs. A desktop lock prevents duplicate
@@ -67,6 +72,11 @@ default to ONNX. No site-packages files are rewritten.
 
 Settings writes are atomic; secrets stay in a separate .env. A packaged app defaults to
 Application Support configuration and restores known Homebrew directories to Finder's PATH.
-PyInstaller collects the fixed plugin modules, native speech/recognition dependencies and,
-on Apple Silicon, LiteRT. Large voice/wake weights are downloaded separately.
+PyInstaller explicitly targets arm64 and collects the fixed plugin modules, native
+speech/recognition dependencies and LiteRT. The app declares macOS 14 as its minimum.
+Build validation checks every Mach-O arm64 slice and its deployment target using lipo/otool,
+then emits a compatibility manifest. The packaged desktop has a bounded, no-audio demo smoke mode
+that verifies Qt startup and worker shutdown on the build OS and a newer macOS runner.
+CI produces one Apple Silicon ZIP/DMG; it does not produce an Intel artifact.
+Large voice/wake weights are downloaded separately.
 Login startup is installed only by an explicit --startup install command.

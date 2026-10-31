@@ -1,8 +1,8 @@
 # Validation
 
-Local verification on 2026-10-31: Python 3.12.14 on Linux, 95 tests passed;
+Apple Silicon target update on 2026-10-31: Python 3.12.14 on Linux, 109 tests passed;
 Ruff lint/format and diff checks passed. The Qt smoke test rendered real widgets
-offscreen and closed the worker cleanly. Mac CI has not run for this new implementation.
+offscreen and closed the worker cleanly. CI results are tied to the exact commit in the PR.
 
 Run these checks from the repository root:
 
@@ -30,9 +30,13 @@ The original 64 Phase 1 tests remain, with additional checks for:
 - Real Qt widgets in a separate offscreen process: pet states, chat, settings, approval dialog,
   and complete worker shutdown, without a microphone or network request.
 - Settings/key separation, environment override synchronization and opt-in startup manifests.
+- Apple Silicon host/OS checks, Rosetta rejection, future arm64 compatibility, and
+  Mach-O audit failures for Intel-only dependencies or too-new deployment targets.
 
-The companion CI runs checks on Ubuntu and macOS with Python 3.11/3.12. The packaging workflow
-builds development .app artifacts on Mac runners. Check the workflow result for the exact
+The companion CI runs checks on Ubuntu and native ARM64 macOS 15/current macOS with Python 3.11/3.12.
+The Apple Silicon packaging workflow explicitly builds arm64, audits every bundled Mach-O
+against the macOS 14 minimum, creates a ZIP/DMG, and smoke-tests the same packaged app on
+macOS 15 and the current macOS runner. Check the workflow result for the exact
 commit; a source test pass is not evidence of audible speech or real microphone recognition.
 
 ## Physical Mac acceptance
@@ -57,9 +61,11 @@ commit; a source test pass is not evidence of audible speech or real microphone 
    hide/show chat, settings restart and single-instance behavior.
 10. Explicitly install/status/uninstall the LaunchAgent from a logged-in desktop session.
     Verify the correct virtualenv/app launches and removal preserves data.
-11. Build on Intel and Apple Silicon separately. Launch from Finder with a clean user profile,
-    configure the provider, download models into Application Support and repeat audio checks.
+11. Use the same Apple Silicon build on physical M1, M2, M3, M4 and M5-family devices as available.
+    Launch from Finder with a clean user profile, configure the provider, download models into
+    Application Support and repeat audio checks. The binary audit proves ABI/deployment metadata,
+    not per-device wake detection or physical microphone compatibility.
     A distribution release additionally needs signing/notarization and Gatekeeper testing.
 
-No physical Mac or live paid API credential is available in the build workspace.
+No physical M1–M5 device inventory or live paid API credential is available in the build workspace.
 These final hardware/account checks must be recorded separately; they are not claimed complete.

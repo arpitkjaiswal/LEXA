@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from buddy.core.errors import BuddyError
+from buddy.core.platform_support import require_apple_silicon
 
 LABEL = "io.lexa.buddy"
 
@@ -39,6 +40,7 @@ def startup(action: str, config_path: Path, env_path: Path) -> str:
         return "BUDDY login startup removed. Your settings and memories were preserved."
     if action != "install":
         raise BuddyError("Unknown startup action.")
+    require_apple_silicon()
     if not config_path.is_file():
         raise BuddyError("Save a config.yaml before installing login startup.")
     executable = str(Path(sys.executable).absolute())  # keep the virtualenv interpreter symlink

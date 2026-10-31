@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "buddy-desktop"
 version = "0.2.0"
-description = "A talking macOS desktop pet with local voice recognition and allowlisted laptop skills."
+description = "A native Apple Silicon desktop pet with local voice recognition and allowlisted laptop skills."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

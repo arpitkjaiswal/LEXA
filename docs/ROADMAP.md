@@ -2,6 +2,7 @@
 
 Repository: LEXA. Companion: BUDDY. Version 0.2 adds the remaining application layers.
 “Implemented” here describes source, not completion of physical Mac release certification.
+Distribution targets native arm64 Apple Silicon M1–M5 and compatible successors on macOS 14+.
 
 | Phase | Source status | Remaining validation |
 | --- | --- | --- |
@@ -9,7 +10,7 @@ Repository: LEXA. Companion: BUDDY. Version 0.2 adds the remaining application l
 | 2 · wake and skills | Implemented: local detection, Apple Silicon LiteRT path, tool loops, allowlist, confirmations, apps/web/volume/time/music | Wake accuracy, Homebrew playback, app IDs and OS permission behavior |
 | 3 · desktop pet | Implemented: transparent draggable animated pet, states, chat, tray, concurrent mute/stop, approval UI | Window behavior across displays/Spaces and assistive access |
 | 4 · durable features | Implemented: explicit facts, optional history, notes, UTC timers/reminders, weather, confirmed screenshots | Sleep/restart delivery and Screen Recording on real hardware |
-| 5 · settings/distribution | Implemented: native editor, .env separation, schema version guard, opt-in LaunchAgent, .app recipe and CI build | Clean install/uninstall on Intel/Apple Silicon, Developer ID signing and notarization |
+| 5 · settings/distribution | Implemented: native editor, .env separation, schema guard, opt-in LaunchAgent, arm64 app/DMG, transitive binary audit and cross-OS smoke tests | Clean install/uninstall and audio on physical M1–M5 devices, Developer ID signing and notarization |
 
 ## Accepted limits
 

@@ -19,6 +19,7 @@ from buddy.core.console import Console
 from buddy.core.doctor import report
 from buddy.core.errors import BuddyError
 from buddy.core.hotkey import GlobalPushToTalk
+from buddy.core.platform_support import require_apple_silicon
 from buddy.core.reminders import Reminders
 from buddy.core.runner import TerminalRunner
 from buddy.core.storage import Store
@@ -69,6 +70,7 @@ def parser() -> argparse.ArgumentParser:
         help="Opt-in macOS login startup management",
     )
     result.add_argument("--tts-worker", action="store_true", help=argparse.SUPPRESS)
+    result.add_argument("--desktop-smoke-test", action="store_true", help=argparse.SUPPRESS)
     return result
 
 
@@ -93,6 +95,8 @@ async def run(args: argparse.Namespace) -> int:
         path = args.config or Path.cwd() / "config.yaml"
         console.write(startup(args.startup, path, args.env_file or path.parent / ".env"))
         return 0
+    if not args.text and args.once is None:
+        require_apple_silicon()
     brain = create_brain(config, demo=args.demo)
     audit: AuditLog | None = None
     assistant: Assistant | None = None
@@ -172,6 +176,8 @@ def main() -> int:
             parser().error(
                 "--desktop has its own Record control; omit --text, --once and --ptt global"
             )
+        if args.desktop_smoke_test and not (args.desktop and args.demo and args.no_tts):
+            parser().error("--desktop-smoke-test requires --desktop --demo --no-tts")
         frozen = getattr(sys, "frozen", False)
         if frozen and sys.platform == "darwin":
             # Finder launches do not inherit a shell's Homebrew PATH.
@@ -186,6 +192,7 @@ def main() -> int:
             if not args.config.exists():
                 save_settings(Config(), args.config)
         if args.desktop or (frozen and len(sys.argv) == 1):
+            require_apple_silicon()
             try:
                 from buddy.ui.app import run_desktop
             except ImportError:
@@ -197,7 +204,12 @@ def main() -> int:
                 config = replace(config, tts=replace(config.tts, backend="none"))
             path = args.config or Path.cwd() / "config.yaml"
             return run_desktop(
-                config, path, args.env_file or path.parent / ".env", demo=args.demo, wake=args.wake
+                config,
+                path,
+                args.env_file or path.parent / ".env",
+                demo=args.demo,
+                wake=args.wake,
+                smoke_test=args.desktop_smoke_test,
             )
         return asyncio.run(run(args))
     except BuddyError as error:
