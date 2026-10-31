@@ -1,4 +1,4 @@
-name: Phase 1 checks
+name: Companion checks
 
 on:
   push:
@@ -12,16 +12,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-15, macos-latest]
         python-version: ["3.11", "3.12"]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux Qt runtime libraries
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libegl1 libgl1 libopengl0 libxkbcommon0
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
-      - run: python -m pip install -e ".[dev]" numpy
+      - run: python -m pip install -e ".[dev,desktop]" numpy scipy
       - run: python -m ruff check .
       - run: python -m ruff format --check .
       - run: python -m pytest -q

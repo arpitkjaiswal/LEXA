@@ -1,18 +1,14 @@
 # Repository presentation
 
-Repository: **LEXA**. Product: **BUDDY**, configurable in `config.yaml`.
+Repository: **LEXA**. Product: **BUDDY**, configurable in Settings or config.yaml.
 
-Suggested GitHub About description:
+Suggested About description:
 
-> BUDDY — a macOS-first talking AI desktop companion in Python, with local Whisper STT,
-> streaming Claude/OpenAI/Ollama chat and natural speech. Phase 1 terminal MVP.
+> BUDDY — a native Apple Silicon M1–M5 desktop pet with local Whisper, wake words, Claude/OpenAI/Ollama,
+> allowlisted laptop controls, durable memory, reminders and a native Python/Qt interface.
 
-Suggested topics:
+Suggested topics: python, macos, apple-silicon, arm64, voice-assistant, desktop-pet, pyside6, faster-whisper,
+openwakeword, anthropic, openai, ollama, text-to-speech, personal-assistant.
 
-`python`, `macos`, `voice-assistant`, `desktop-pet`, `faster-whisper`, `anthropic`,
-`openai`, `ollama`, `text-to-speech`, `personal-assistant`
-
-The README, setup guide, architecture, security boundary and phase roadmap are maintained
-in this repository. The GitHub About field/topics are separate repository settings;
-this file does not apply them automatically. No website, license or production-ready
-release should be claimed until it actually exists.
+GitHub About/topics are repository settings, separate from these source files.
+Development app artifacts are not a claim of signing, notarization or a production release.

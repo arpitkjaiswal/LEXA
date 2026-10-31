@@ -1,288 +1,288 @@
-# BUDDY
+# BUDDY · LEXA
 
-**A talking desktop friend for macOS.** Built in Python, with local speech recognition,
-streamed AI replies, natural speech, and an architecture that can grow into a desktop pet.
+A talking desktop friend for **Apple Silicon Macs**, built in Python. BUDDY sits above your windows,
+listens when you enable a wake word or press Record, chats with you, and runs requested
+laptop actions through an allowlist.
 
-This repository is named **LEXA**. The companion's default name is **BUDDY**;
-change `pet.name` in `config.yaml` whenever you like.
+**LEXA** is the repository name. **BUDDY** is the default companion name; change it in Settings.
 
-## Current release: Phase 1 — terminal voice MVP
+## Apple Silicon target
 
-**Works now:** deliberate push-to-talk → local faster-whisper → Claude / OpenAI / Ollama
-→ streamed spoken reply. A text mode and a clearly labelled demo are included.
+One native **arm64** app targets **M1, M2, M3, M4 and M5** families, including their
+Pro/Max/Ultra variants where available. The baseline is **macOS 15.2 or later**.
+The runtime checks the ABI and OS version rather than maintaining a chip-name allowlist,
+so compatible future arm64 Macs are not blocked. Intel/Rosetta builds are no longer shipped.
 
-- Terminal PTT: Enter to start recording, Enter again to stop.
-- Optional global hold-to-talk: Control + Option + Space; release to stop.
-- Short, warm responses and configurable name/personality.
-- Sentence-by-sentence speech starts while the LLM is still generating.
-- Edge audio streams directly to mpv/ffplay. Local pyttsx3 and macOS `say` fallbacks.
-- Bounded microphone capture, silence rejection, local resampling/recognition, and clear errors.
-- `/mute`, `/unmute`, `/reset`, `/help`, `/quit`; Ctrl-C stops the app.
-- Bounded conversation context in RAM. Local rotating action metadata logs.
+CI audits the app executable and every bundled Mach-O dependency for an arm64 slice and
+a deployment target no newer than macOS 15.2. Qt 6.11.3 and LiteRT 2.3.0 are pinned
+to their verified binary requirements; re-run the audit before changing these versions.
+PyAV 18.1.0 is pinned because faster-whisper’s decoder uses the metadata_errors argument
+removed in PyAV 19. The workflow checks real audio decoding/VAD before and after packaging.
+The same built app is smoke-tested on macOS 15
+and the current macOS runner. This is architecture/OS validation, not physical testing of
+every M-series model; microphone and wake-word accuracy need on-device acceptance.
 
-**Planned:** wake word, computer-control skills, music, animated pet, SQLite memory,
-reminders, notes, weather, screenshots, settings, startup integration, and packaging.
-They are **not enabled** in this MVP. See [the phase roadmap](docs/ROADMAP.md).
+## Development release 0.2
 
-## macOS setup
+The remaining companion features are implemented in source:
 
-Use Python **3.11 or 3.12** for the voice dependencies. Both Apple Silicon and Intel
-are intended targets; physical Mac audio and permissions need the manual checks below.
+| Feature | Behavior |
+| --- | --- |
+| Desktop pet | Transparent, draggable, always on top; animated idle, listening, thinking, talking, happy, sleeping and approval states |
+| Voice | Local faster-whisper, optional openWakeWord, Record toggle and terminal/global PTT |
+| AI | Claude, OpenAI Responses, or a tool-capable local Ollama model |
+| Speech | Built-in macOS say by default; optional Edge, pyttsx3 or Piper |
+| Laptop controls | Launch allowlisted apps, browser search/HTTPS navigation, system volume, clock |
+| Music | yt-dlp search and one managed mpv player; pause, resume, next result, stop |
+| Memory | Explicitly saved preferences; optional retained chats; inspect and delete controls |
+| Productivity | SQLite notes, durable local timers/reminders, current weather, confirmed local screenshots |
+| Setup | No-key local commands, live settings, voice preparation, optional login startup, ARM64 ZIP/DMG |
 
-If you use Homebrew:
+This is a development build. Physical microphone, wake-word accuracy, TCC permissions and
+clean installation still need the [Mac acceptance checks](docs/VALIDATION.md).
+Developer ID signing and notarization are not supplied.
 
-```bash
-brew install python@3.11 portaudio mpv
-git clone https://github.com/arpitkjaiswal/LEXA.git
+## Install the app (no Python needed)
+
+1. Open the latest successful [Apple Silicon build](https://github.com/arpitkjaiswal/LEXA/actions/workflows/macos-app.yml),
+   select the `codex/complete-macos-companion` branch run, and download the
+   **BUDDY-AppleSilicon-development** artifact. GitHub requires sign-in for artifact downloads.
+2. Extract the download, open **BUDDY-AppleSilicon.dmg**, and drag **BUDDY.app** into Applications.
+3. Open BUDDY from Applications on an Apple Silicon Mac running macOS 15.2 or newer.
+   This is an ad-hoc signed development app, without Developer ID notarization;
+   macOS may require explicit approval before launch.
+4. Type **what time is it** to test local mode immediately. Use **Configure AI** for
+   conversation, or tick **Demo** for clearly labelled canned replies.
+5. Press **Prepare voice** to cache and load Whisper. The first run needs internet and
+   enough space for the selected model. Choose `tiny` in Settings for a lighter download.
+   After **Voice ready**, press **Record**, grant Microphone access, speak, and press
+   **Finish recording**. Built-in macOS speech works without Homebrew players.
+
+Whisper and optional wake-model weights download separately; they are not embedded in the app.
+Music and optional Edge/Piper playback still need their external players.
+**Stop reply**, **Mute**, and **Quit** can interrupt Whisper preparation or transcription.
+
+## Run from source
+
+Use native ARM64 Python **3.11 or 3.12**, in a terminal running outside Rosetta.
+Apple Silicon Homebrew uses /opt/homebrew:
+
+~~~bash
+brew install python@3.12 portaudio mpv yt-dlp
+git clone --branch codex/complete-macos-companion https://github.com/arpitkjaiswal/LEXA.git
 cd LEXA
-python3.11 -m venv .venv
+/opt/homebrew/bin/python3.12 -m venv .venv
 source .venv/bin/activate
+python -c "import platform; assert platform.machine() == 'arm64', 'Use native ARM64 Python'"
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 cp .env.example .env
-```
+~~~
 
-Do not run with `sudo`. BUDDY does not need admin access.
+The requirements install voice, desktop and music extras. Wake-word detection is optional:
 
-### 1. Test the terminal without an API key or microphone
+~~~bash
+python -m pip install -e ".[wake]"
+python -m buddy --download-wake-models
+~~~
 
-```bash
-python -m buddy --demo --text --no-tts
-```
+No administrator privileges are needed.
 
-Type anything, then `/quit`. This is a **canned demo response**, not an AI conversation.
-For a one-command smoke check:
+## Start the pet
 
-```bash
-python -m buddy --demo --no-tts --once "Hello Buddy"
-```
+~~~bash
+python -m buddy --desktop
+~~~
 
-### 2. Configure one real AI provider
+The window opens in local mode before an AI provider is configured. Open **Configure AI**,
+enter your name, choose a provider and exact model ID, optionally enter its API key, and save.
+Settings apply immediately; the active turn stops and session context reloads from saved history.
+Keys are saved separately in the local .env and are never displayed by the settings editor.
 
-Open `.env` locally in your editor. Do not commit it or put keys in `config.yaml`.
-Choose an exact model ID your account can access; BUDDY deliberately does not guess it.
-
-| Brain | Required `.env` settings |
+| Provider | Configuration |
 | --- | --- |
-| Claude (default) | `BUDDY_PROVIDER=anthropic`, `BUDDY_MODEL=<your model ID>`, `ANTHROPIC_API_KEY=<your key>` |
-| OpenAI / ChatGPT models via API | `BUDDY_PROVIDER=openai`, `BUDDY_MODEL=<your model ID>`, `OPENAI_API_KEY=<your key>` |
-| Local Ollama | `BUDDY_PROVIDER=ollama`, `BUDDY_MODEL=<an installed model name>`, `OLLAMA_BASE_URL=http://127.0.0.1:11434` |
+| Claude | BUDDY_PROVIDER=anthropic, BUDDY_MODEL=your accessible model, ANTHROPIC_API_KEY |
+| OpenAI | BUDDY_PROVIDER=openai, BUDDY_MODEL=your accessible model, OPENAI_API_KEY |
+| Ollama | BUDDY_PROVIDER=ollama, BUDDY_MODEL=an installed tool-capable model, local server running |
 
-For Ollama, install it from its official distribution, start it, and pull your chosen
-model before running BUDDY. Keep the endpoint on localhost for an offline setup.
-Pointing it at another machine sends prompts to that machine.
+You can configure the same values directly in .env. Existing process environment variables
+take priority. The settings editor aligns pre-existing .env overrides with saved choices.
+Ollama model support for tools varies; a chat-only model cannot reliably control the laptop.
 
-```bash
+- **Double-click the pet / Record:** start recording; click again to finish.
+- **Drag the pet:** move it. **Right-click / menu-bar icon:** open its controls.
+- **Mute:** close microphone/wake capture, interrupt the current reply, revoke pending approval.
+- **Stop reply:** interrupt recording, generation or speech.
+- **Memories:** inspect saved facts/history and request deletion.
+- **Sleep:** mute and show the sleeping state. Unmute to resume.
+- **Quit:** stop the worker, capture and managed players.
+
+Record has a 25-second cap. Wake-triggered commands also stop after speech ends.
+Microphone capture closes before transcription and speech playback.
+
+A deterministic demo needs no key, microphone or AI service:
+
+~~~bash
+python -m buddy --desktop --demo --no-tts
+python -m buddy --demo --no-tts --once "Hello BUDDY"
+~~~
+
+The **Demo** checkbox switches modes without restarting. Demo replies are canned and
+**do not execute laptop actions**. Untick it to return to your provider or local mode.
+
+Without a provider, local mode accepts an explicit vocabulary: `what time is it`,
+`set a timer for 5 minutes`, `list reminders`, `cancel reminder ID`, `open calculator`,
+`open YouTube`, `search for QUERY`, `set volume to 40 percent`, `note TITLE: BODY`,
+`list notes`, `read note ID`, `delete note ID`, `remember KEY: VALUE`,
+`what do you remember`, and `take a screenshot`. IDs come from the local results.
+The same allowlist, validation and exact-action approvals apply. Other phrasing needs an AI
+provider; local mode explains the available commands instead of inventing a response.
+
+## Wake-word listening
+
+~~~bash
+python -m buddy --desktop --wake
+# Or terminal mode:
+python -m buddy --wake
+~~~
+
+Enable it from the menu only after installing the wake extra and downloading models.
+The built-in default is **“Hey Jarvis”** (hey_jarvis). Say the phrase, pause briefly,
+then speak the command. **The microphone stays open locally while waiting for the phrase.**
+Wake detection is suspended during command capture, generation, speech and approval.
+
+`wake.framework: auto` selects LiteRT/TFLite on Apple Silicon and ONNX elsewhere.
+A process-local compatibility adapter connects openWakeWord 0.6 to Google's LiteRT
+Interpreter API; it does not modify installed packages. This avoids depending on the
+ONNX path affected by [upstream issue #336](https://github.com/dscripka/openWakeWord/issues/336).
+Accuracy still requires testing on your own Mac; use Record/PTT if detection is unreliable.
+
+Models and feature networks download into BUDDY's writable data directory, including
+when packaged as an app. The menu also has **Download wake model**.
+A phrase such as “hey Aora” needs a corresponding trained .onnx/.tflite model;
+changing a text label does not train a wake word. Use an absolute trained model path in config.
+Re-download after changing framework or built-in model.
+
+## Things to ask
+
+- “Play some lo-fi.” “Pause.” “Next song.” “Stop the music.”
+- “Open VS Code.” “Open YouTube.” “Search for binary search trees.”
+- “Set volume to 40 percent.” “What time is it?”
+- “Set a timer for ten minutes.” “Remind me tomorrow at six PM to revise.”
+- “Save a note called revision: finish chapter two.”
+- “Remember that I prefer short explanations.” “What do you remember about me?”
+- “What's the weather in Manipal?” “Take a screenshot.”
+- Or just chat, joke, or ask for encouragement.
+
+Music controls apply to BUDDY's managed player; next moves to the next search result.
+Other players are not controlled. Music/network extraction can fail; errors do not count as success.
+App aliases/bundle IDs and permitted web domains are configurable in config.yaml.
+
+The AI proposes a tool; schemas, allowlisting and policy run outside the model.
+Screenshots and deletion of notes/memory require an **action-specific approval dialog**,
+or `/confirm ID` in the terminal. Approvals expire after 60 seconds and are single-use.
+Generic “yes,” old IDs, new conversation turns, mute and cancellation cannot approve a new action.
+
+## Saved data and reminders
+
+Data is local to `~/Library/Application Support/BUDDY` on macOS, or BUDDY_DATA_DIR.
+
+| Data | Default behavior |
+| --- | --- |
+| Audio / transcription buffers | RAM only; recognition is local |
+| Current transcript, session history, saved facts, requested tool results | Sent to the selected AI provider; local for localhost Ollama |
+| Edge speech text | Sent to the configured Edge TTS service |
+| say / pyttsx3 / Piper speech | Local synthesis; Piper voice is downloaded separately |
+| Saved preferences | Explicit “remember” requests only, up to 100 facts |
+| Chat retention | Off by default; enable in Settings; bounded to 50 turns by default |
+| Notes / reminders | Saved in buddy.sqlite3; up to 500 notes / 100 pending reminders |
+| Screenshots | Confirmed captures saved under screenshots; no image upload tool |
+| Audit log | Rotating local metadata, without chat, audio, arguments or API keys |
+
+Reminders use UTC timestamps. Dated reminders require an explicit offset to avoid DST ambiguity;
+the model reads the clock to resolve a requested local time. Set memory.timezone to an IANA name
+such as Asia/Kolkata to pin the clock zone. Timers survive restarts and sleep.
+**BUDDY must be running to alert you.** Missed reminders appear after the next start/wake;
+the app does not wake the Mac or schedule ChatGPT cloud automations.
+An interrupted delivery may repeat after a crash rather than silently disappear.
+Muted alerts are visual. Quit stops delivery until the next start.
+
+**Reset current session** clears RAM context. **Delete saved chat history** removes retained
+turns and clears current context; saved facts and notes have their own deletion controls.
+Disabling retention stops new saves; it does not delete previously saved records.
+SQLite and .env use owner-only file permissions; they are not encrypted at rest.
+
+## Local speech and terminal controls
+
+Built-in macOS `say` is the default for new installs; existing saved voice choices are preserved.
+Choose another engine in Settings or set BUDDY_TTS_BACKEND. Edge requires internet and mpv/ffplay.
+For Piper, install the Piper CLI separately, choose a local .onnx voice with its .onnx.json
+file alongside it, and set tts.piper_model and the matching tts.piper_sample_rate.
+The app streams raw Piper audio to mpv and does not download a voice silently.
+
+~~~bash
 python -m buddy --doctor
 python -m buddy --text --no-tts
-```
+python -m buddy                    # Enter starts; Enter finishes
+python -m buddy --ptt global       # hold Control + Option + Space
+~~~
 
-Try “Hey Buddy, help me get motivated to study.” A live reply should stream to the terminal.
-The readiness report checks local configuration and package presence; it does not verify
-API quota, model access, downloaded model weights, or OS permissions.
+Terminal commands: `/help /mute /unmute /reset /memory /confirm ID /cancel /quit`.
+Use Ctrl-C to interrupt terminal generation/playback. Desktop Mute and Stop are concurrent controls.
+Global hotkeys may need Input Monitoring/Accessibility permissions; Record/terminal PTT remain available.
 
-### 3. Try voice
+For an offline conversation, use cached Whisper weights, localhost Ollama, and an installed
+local voice. Weather, web/music, Edge and initial downloads require network access.
 
-```bash
-python -m buddy
-```
+## macOS permissions
 
-Whisper loads **before** the microphone opens. Its first run may download model weights.
-Wait for `[Mic OFF]`, press Enter, speak, and press Enter again. Recording closes before
-transcription and playback start. Capture also stops automatically after 25 seconds.
-Whisper can detect the language automatically; set `stt.language: en` for English only.
+Grant Microphone access to the app hosting Python (or the built app).
+Grant Screen Recording only if using confirmed screenshots.
+Global hotkeys may need Accessibility/Input Monitoring. macOS remains responsible for permission
+prompts; BUDDY cannot grant itself access. Keep wake listening disabled when you want the idle mic off.
 
-When macOS asks, allow **Microphone** access for the application hosting Python
-(Terminal, iTerm, or your editor). You can manage it under
-**System Settings → Privacy & Security → Microphone**.
+## Login startup and app packaging
 
-For a global hotkey:
+Startup is opt-in; installing/running BUDDY does not register it automatically:
 
-```bash
-python -m buddy --ptt global
-```
+~~~bash
+python -m buddy --startup install
+python -m buddy --startup status
+python -m buddy --startup uninstall
+~~~
 
-Hold **Control + Option + Space**, speak, then release. Configure `audio.hotkey` to change it.
-Depending on macOS and the terminal, pynput may require **Input Monitoring** and/or
-**Accessibility** permission. If the listener does not work, use terminal PTT.
-This app does not grant itself permissions. The global listener observes key events to
-recognize its chord; it does not log keystrokes or capture audio while idle.
-Hotkeys pressed while BUDDY is replying are ignored. Overlapping conversations are disabled.
+The per-user LaunchAgent preserves your selected virtualenv interpreter and explicit config paths.
+Uninstalling startup preserves notes, memory and settings.
 
-### 4. Choose speech output
+Build on an Apple Silicon Mac using native ARM64 Python:
 
-Default `tts.backend: edge` uses the configured Microsoft Edge voice and needs Internet
-and `mpv` or `ffplay`. Audio chunks are piped to the player; no recording or TTS file is saved.
-Edge TTS depends on an external service and can fail; local fallbacks keep the text reply usable.
+~~~bash
+python -m pip install -e ".[voice,desktop,wake,music,package]"
+python -m PyInstaller --clean --noconfirm packaging/BUDDY.spec
+python -m buddy.build_tools.verify_macos dist/BUDDY.app --output dist/AppleSilicon-compatibility.json
+open dist/BUDDY.app
+~~~
 
-For local macOS speech, add this to `.env`:
-
-```dotenv
-BUDDY_TTS_BACKEND=say
-```
-
-`say` uses installed macOS voices. Choose an installed voice with `tts.local_voice`.
-`pyttsx3` is also supported; its OS engine runs in a child process so Cocoa has a main thread.
-Piper is reserved for a later offline voice upgrade and is not implemented in Phase 1.
-
-For a fully local runtime, use cached Whisper weights (`stt.local_files_only: true`),
-Ollama on localhost with a downloaded model, and an installed local TTS voice.
-Initial model/voice/package downloads still need a connection. Use `--no-tts` for silent replies.
-
-## Controls and verification
-
-| Command / key | Behavior |
-| --- | --- |
-| Enter, then Enter again | Terminal PTT start / stop |
-| Hold configured global chord | Global PTT; release stops |
-| `/mute` | Disable new microphone captures and spoken replies; during capture, stop and discard it |
-| `/unmute` | Enable capture and speech again |
-| `/reset` | Clear the in-memory conversation |
-| `/help` | Show controls |
-| `/quit` or Ctrl-C | Exit and close audio/player resources |
-
-Terminal commands are accepted while idle and recording. While generating or speaking,
-Ctrl-C exits immediately; the concurrent tray mute and stop controls arrive in Phase 3.
-In text mode `/mute` still allows typed chat but suppresses speech.
-
-Phase 1 manual acceptance checks on your Mac:
-
-1. Run the demo above, then a real typed conversation with `--text --no-tts`.
-2. In voice mode, check that the OS mic indicator is off while idle and during replies.
-3. Start a recording, say a sentence, stop, and hear the reply. Try only silence as well.
-4. Start recording and type `/mute`; the capture must be discarded. Enter while muted
-   must not open the mic. `/unmute` restores capture.
-5. Let a recording reach its time limit; the next prompt must remain usable.
-6. Disconnect Internet: cloud brain errors must be readable and the mic must close.
-7. Test `BUDDY_TTS_BACKEND=say`, then the global chord if you enable its permissions.
-8. Press Ctrl-C during capture, generation, and speech; the mic indicator/player must stop.
-
-These hardware/API checks cannot be established by mocked automated tests alone.
-
-## Configuration and data
-
-`config.yaml` controls pet/personality, audio, STT, provider, speech and logging.
-The order is **environment variables → `.env` → YAML → defaults**.
-The app reads `.env` beside the selected config; it does not search parent folders.
-Run from the repository root, or pass explicit paths:
-
-```bash
-python -m buddy --config /absolute/path/config.yaml --env-file /absolute/path/.env
-```
-
-`--text` and `--once` never initialize a microphone or Whisper. `--no-tts` never calls TTS.
-No conversation persists after exit in Phase 1. SQLite chat history and editable user facts
-are planned for Phase 4; the configured name/personality already apply to each session.
-
-Logs live at `~/Library/Application Support/BUDDY/logs/actions.jsonl` on macOS.
-They contain timestamps, state transitions, success/error categories and lengths,
-**not audio, transcripts, full replies, API keys or keystrokes**. Rotation is bounded.
-Set `BUDDY_DATA_DIR` to change the data location, or `logging.enabled: false` to disable logging.
-
-| Data | Destination in this release |
-| --- | --- |
-| Microphone PCM | RAM → local faster-whisper; never sent to a speech API |
-| Current transcript + recent session context | Selected Claude/OpenAI API or configured Ollama endpoint |
-| Reply text, with Edge selected | Configured Edge TTS service |
-| Reply text, with pyttsx3 / say selected | Local OS speech engine |
-| Action metadata | Local rotating log directory |
-| Model/package downloads | Package registry and configured model distribution/cache |
-
-There is no telemetry, arbitrary shell executor, autonomous desktop access or remote
-computer-control endpoint. Subprocesses launch only fixed speech engines/players with
-argument arrays and text over stdin. AI-generated text is never executed.
-See [SECURITY.md](SECURITY.md) for the boundary planned for computer-control skills.
-
-## Project structure
-
-```text
-buddy/
-  main.py
-  core/
-    config.py       # typed YAML/.env loading and validation
-    console.py      # cancellable macOS terminal input
-    hotkey.py       # optional global hold-to-talk
-    audio.py        # bounded, on-demand, in-memory recording
-    stt.py          # local faster-whisper
-    brain.py        # Claude / OpenAI / Ollama / labelled demo
-    tts.py          # streaming Edge and local speech fallbacks
-    assistant.py    # turn orchestration, state events, RAM context
-    runner.py       # terminal controls and capture lifecycle
-    audit.py        # privacy-filtered action logs
-    doctor.py       # read-only setup diagnostics
-  skills/           # Phase 2: no actions loaded yet
-  ui/               # Phase 3: no desktop overlay yet
-tests/
-docs/
-config.yaml
-.env.example
-requirements.txt
-pyproject.toml
-```
+The GitHub **Build Apple Silicon app** workflow produces one development download containing
+**BUDDY-AppleSilicon.zip**, a **BUDDY-AppleSilicon.dmg** drag-to-Applications installer,
+and **AppleSilicon-compatibility.json** with the native binary audit. Use this same download
+for M1–M5; there is no separate Intel package.
+Whisper/wake/Piper weights and Homebrew players are separate dependencies.
+Finder launches use a private user config in Application Support, never bundled API keys.
+A Developer ID identity, notarization and clean Mac permission/installation checks are still
+required before a public signed release.
 
 ## Development
 
-```bash
-python -m pip install -e ".[dev]"
-python -m pytest -q
+~~~bash
+python -m pip install -e ".[dev,desktop]" numpy scipy
 python -m ruff check .
 python -m ruff format --check .
-```
+python -m pytest -q
+~~~
 
-Automated tests exercise provider streams using real SDKs against mock HTTP transports,
-audio and STT lifecycle doubles, privacy, cancellation, muted capture, speech failures,
-and the CLI. They do not make paid API calls, download model weights, or open real microphones.
-CI targets Python 3.11 and 3.12, including macOS. A green CI job is not a physical audio test.
+See [architecture](docs/ARCHITECTURE.md), [implementation roadmap](docs/ROADMAP.md),
+[validation and physical checks](docs/VALIDATION.md), and [security](SECURITY.md).
 
-### Adding skills (Phase 2 contract)
-
-The MVP does not register or execute skills. The planned plugin interface is a Python
-module in `buddy/skills/`, exporting `name`, `description`, `schema`, and async `run()`:
-
-```python
-# Planned interface; not executable by the Phase 1 assistant.
-name = "get_time"
-description = "Get the laptop's current local time."
-schema = {"type": "object", "properties": {}, "additionalProperties": False}
-
-
-async def run(arguments: dict[str, object]) -> dict[str, object]:
-    from datetime import datetime
-
-    return {"time": datetime.now().astimezone().isoformat()}
-```
-
-Phase 2 will add schema validation, explicit registration/allowlisting, audit logging,
-provider tool-result round trips and confirmation enforcement. Do not add shell executors
-or dynamically execute LLM output. Details and phase acceptance tests are in
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) and [ROADMAP.md](docs/ROADMAP.md).
-
-## Troubleshooting
-
-- **No mic / permission denied:** allow your terminal's Microphone permission; run
-  `python -m buddy --list-devices` and set `audio.device` to an input index.
-- **Whisper too slow:** try `stt.model: tiny`; CPU `int8` is the default. Check RAM/disk.
-- **Whisper cannot download:** check model-network access. Cache weights before setting
-  `local_files_only: true`; that switch does not download them.
-- **Model/key error:** confirm `BUDDY_MODEL`, provider selection and API access locally.
-  API exception bodies are deliberately not printed or logged.
-- **No speech output:** `brew install mpv`, or choose local `say`. On an unavailable
-  voice/backend, text replies remain visible. Use `--no-tts` while diagnosing.
-- **Global hotkey does nothing:** check macOS Input Monitoring / Accessibility or use
-  `--ptt terminal`. Avoid a chord already reserved by macOS or your applications.
-- **Background noise is captured:** tune `audio.silence_rms`, use a headset and verify
-  the transcript. Speech recognition is not an authentication mechanism.
-- **Windows/Linux:** config paths and core code account for these systems, but macOS
-  is the first target. Global keys, OS voices, PortAudio and terminal cancellation
-  need platform-specific testing before support is claimed.
-
-## Upstream references
-
-- [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
-- [Anthropic streaming SDK](https://github.com/anthropics/anthropic-sdk-python/blob/main/helpers.md)
-- [OpenAI response streaming](https://developers.openai.com/api/docs/guides/streaming-responses)
-- [Ollama chat API](https://docs.ollama.com/api/chat)
-- [edge-tts](https://github.com/rany2/edge-tts)
-- [python-sounddevice](https://python-sounddevice.readthedocs.io/)
-
-No license grant has been selected for this repository yet.
+Linux is used only for development checks; the shipped desktop/voice entry points require
+native arm64 macOS 15.2+. Text/demo/doctor commands and offscreen Qt tests remain usable for development.

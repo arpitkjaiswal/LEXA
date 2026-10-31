@@ -34,9 +34,16 @@ class RecordedAudio:
 
 
 class Microphone:
-    def __init__(self, config: AudioConfig, *, sounddevice_module: Any = None) -> None:
+    def __init__(
+        self,
+        config: AudioConfig,
+        *,
+        sounddevice_module: Any = None,
+        silence_seconds: float | None = None,
+    ) -> None:
         self.config = config
         self._sounddevice = sounddevice_module
+        self.silence_seconds = silence_seconds
 
     async def record(self, stop: threading.Event) -> RecordedAudio:
         """Cancellation signals the recorder and waits for the stream to close."""
@@ -85,6 +92,8 @@ class Microphone:
             max_frames = int(rate * self.config.max_record_seconds)
             chunks: list[bytes] = []
             count = 0
+            heard_speech = False
+            quiet_frames = 0
             with sd.RawInputStream(
                 samplerate=rate,
                 device=self.config.device,
@@ -101,6 +110,18 @@ class Microphone:
                         )
                     chunks.append(bytes(data))
                     count += frames
+                    if self.silence_seconds is not None:
+                        values = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768
+                        active = float(np.sqrt(np.mean(values * values))) >= self.config.silence_rms
+                        heard_speech = heard_speech or active
+                        quiet_frames = 0 if active else quiet_frames + frames
+                        if (
+                            heard_speech
+                            and quiet_frames / rate >= self.silence_seconds
+                            or not heard_speech
+                            and count / rate >= 8
+                        ):
+                            break
             audio = RecordedAudio(b"".join(chunks), rate)
             if audio.duration < self.config.min_record_seconds:
                 return RecordedAudio(b"", rate)

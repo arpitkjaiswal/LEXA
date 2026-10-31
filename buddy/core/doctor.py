@@ -9,13 +9,15 @@ import sys
 
 from buddy.core.brain import provider_ready
 from buddy.core.config import Config
+from buddy.core.platform_support import host_support
 
 
 def report(config: Config) -> list[str]:
     lines = [
-        f"BUDDY Phase 1 | Python {platform.python_version()} | "
-        f"{platform.system()} {platform.machine()}",
-        "Target: macOS. This check does not request permissions or contact AI services.",
+        f"BUDDY | Python {platform.python_version()} | {platform.system()} {platform.machine()}",
+        "Target: Apple Silicon M1–M5 and compatible arm64 successors, macOS 15.2+.",
+        host_support().message,
+        "This check does not request permissions or contact AI services.",
         f"LLM provider: {config.brain.provider}",
         f"LLM model: {'configured' if config.brain.model.strip() else 'MISSING: set BUDDY_MODEL'}",
         f"LLM credentials: {'configured / not needed' if provider_ready(config) else 'NOT READY'}",
@@ -26,6 +28,16 @@ def report(config: Config) -> list[str]:
         available = importlib.util.find_spec(module) is not None
         status = "installed" if available else 'missing (pip install -e ".[voice]")'
         lines.append(f"{module}: {status}")
+    for module, extra in (("PySide6", "desktop"), ("openwakeword", "wake"), ("yt_dlp", "music")):
+        available = importlib.util.find_spec(module) is not None
+        lines.append(f"{module}: {'installed' if available else f'missing (install .[{extra}])'}")
+    from buddy.core.wake import effective_framework
+
+    lines.append(f"Wake model: {config.wake.model} ({effective_framework(config)}); opt-in.")
+    lines.append(
+        f"Saved preferences: {config.memory.enabled}; chat retention: {config.memory.save_history}"
+    )
+    lines.append("Wake detection opens the mic while idle; PTT keeps it closed until activation.")
     player = shutil.which("mpv") or shutil.which("ffplay")
     lines.append(f"Streaming player: {'available' if player else 'missing (brew install mpv)'}")
     lines.append(f"macOS say fallback: {'available' if sys.platform == 'darwin' else 'macOS only'}")

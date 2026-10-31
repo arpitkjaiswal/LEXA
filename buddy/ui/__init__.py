@@ -1,1 +1,1 @@
-"""Reserved for the PySide6 desktop pet in Phase 3."""
+"""Native animated pet and Qt controls, backed by an isolated asyncio worker."""
